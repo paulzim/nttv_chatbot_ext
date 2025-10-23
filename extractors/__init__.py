@@ -5,14 +5,27 @@ from typing import List, Dict, Any
 from .kihon_happo import try_answer_kihon_happo
 from .sanshin import try_answer_sanshin
 from .schools import try_answer_schools
-from .rank import try_answer_rank_striking   # NEW
+from .rank import try_answer_rank_striking   # rank-aware kicks/punches/striking
+
+# Plural-friendly token pattern for striking intent in rank questions
+_STRIKE_INTENT_RE = re.compile(
+    r"\b("
+    r"kick|kicks|geri|geris|"
+    r"punch|punches|tsuki|tsukis|"
+    r"strikes?|striking|"
+    r"(?:^|[\s\-])ken\b"          # ...-ken / ken as a word
+    r")\b",
+    re.I,
+)
+
+_RANK_RE = re.compile(r"\b\d{1,2}(?:st|nd|rd|th)\s+kyu\b", re.I)
 
 def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> str | None:
     """Route core questions to deterministic extractors; return None if no match."""
     ql = question.lower()
 
     # Rank-specific striking (kicks/punches/striking for Nth kyu)
-    if re.search(r"\b\d{1,2}(?:st|nd|rd|th)\s+kyu\b", ql) and re.search(r"\b(kick|geri|punch|tsuki|ken|strike|striking)\b", ql):
+    if _RANGE_OR_STRIKING(ql := ql):  # bind ql for reuse
         ans = try_answer_rank_striking(question, passages)
         if ans:
             return ans
@@ -36,5 +49,8 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> str | N
             return ans
 
     return None
+
+def _RANGE_OR_STRIKING(ql: str) -> bool:
+    return bool(_RANK_RE.search(ql) and _STRIKE_INTENT_RE.search(ql))
 
 __all__ = ["try_extract_answer"]
