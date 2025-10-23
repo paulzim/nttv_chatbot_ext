@@ -13,7 +13,7 @@ _STRIKE_INTENT_RE = re.compile(
     r"kick|kicks|geri|geris|"
     r"punch|punches|tsuki|tsukis|"
     r"strikes?|striking|"
-    r"(?:^|[\s\-])ken\b"          # ...-ken / ken as a word
+    r"(?:^|[\s\-])ken\b"          # ...-ken / ' ken ' / line-start ken
     r")\b",
     re.I,
 )
@@ -24,8 +24,8 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> str | N
     """Route core questions to deterministic extractors; return None if no match."""
     ql = question.lower()
 
-    # Rank-specific striking (kicks/punches/striking for Nth kyu)
-    if _RANGE_OR_STRIKING(ql := ql):  # bind ql for reuse
+    # ✅ Rank-specific striking (kicks/punches/striking for Nth kyu)
+    if _RANK_RE.search(ql) and _STRIKE_INTENT_RE.search(ql):
         ans = try_answer_rank_striking(question, passages)
         if ans:
             return ans
@@ -49,8 +49,5 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> str | N
             return ans
 
     return None
-
-def _RANGE_OR_STRIKING(ql: str) -> bool:
-    return bool(_RANK_RE.search(ql) and _STRIKE_INTENT_RE.search(ql))
 
 __all__ = ["try_extract_answer"]

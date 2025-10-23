@@ -14,6 +14,10 @@ from openai import OpenAI
 # 🔹 NEW: import the extractor router
 from extractors import try_extract_answer
 
+# ✅ Force CPU for embeddings (important on Windows/PyTorch)
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
+
+
 # ------------- Config / env -------------
 load_dotenv()
 
@@ -42,7 +46,12 @@ with open(CFG_PATH, "r", encoding="utf-8") as f:
     cfg = json.load(f)
 EMBED_MODEL_NAME = cfg.get("embed_model", "sentence-transformers/all-MiniLM-L6-v2")
 
-EMBED_MODEL = SentenceTransformer(EMBED_MODEL_NAME)
+# Force CPU to avoid meta device issues on Windows/PyTorch 2.5+
+import os
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
+
+EMBED_MODEL = SentenceTransformer(EMBED_MODEL_NAME, device="cpu")
+
 index = faiss.read_index(str(FAISS_PATH))
 with open(META_PATH, "rb") as f:
     CHUNKS: List[Dict[str, Any]] = pickle.load(f)
