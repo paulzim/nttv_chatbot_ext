@@ -1,5 +1,5 @@
 # app.py — Streamlit RAG with priority-aware retrieval, strict prompt,
-# and deterministic extractors for Kihon Happo & Sanshin
+# now using modular extractors (Sanshin, Kihon Happo, Schools)
 import os, pickle, json, re
 from pathlib import Path
 from typing import List, Dict, Any
@@ -10,6 +10,9 @@ import streamlit as st
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 from openai import OpenAI
+
+# 🔹 NEW: import the extractor router
+from extractors import try_extract_answer
 
 # ------------- Config / env -------------
 load_dotenv()
@@ -255,252 +258,6 @@ def call_model_with_fallback(client: OpenAI, model: str, system: str, user: str,
     except Exception as e:
         return "", f"{raw}\n\ncompletions error: {e}"
 
-# ---------- Deterministic extractor for Kihon Happo ----------
-def try_answer_kihon_happo(passages: List[Dict[str, Any]]) -> str | None:
-    """
-    Deterministic Kihon Happo answer — keeps Kosshi and Torite cleanly separated.
-    If Torite bullets aren't captured under the anchor, fall back to a global scan.
-    """
-    blob = "\n\n".join(p["text"] for p in passages[:6])
-    blob_low = blob.lower()
-    if "kihon happo" not in blob_low:
-        return None
-
-    # --- anchors / segments (be flexible about spacing, case, punctuation)
-    kosshi_match = re.search(
-        r"(?is)kosshi\s+kihon\s+sanpo\s*:?\s*(.*?)(?:\n\s*(?:torite\s+goho\s+gata)\b|$)",
-        blob
-    )
-    torite_match = re.search(
-        r"(?is)torite\s+goho\s+gata\s*:?\s*(.*?)(?:\n\s*\n|$)",
-        blob
-    )
-
-    def _parse_bullets(seg: str | None) -> list[str]:
-        if not seg:
-            return []
-        out = []
-        started = False
-        for raw in seg.splitlines():
-            r = raw.strip()
-            if not r:
-                if started:
-                    break
-                continue
-            # bullets like -, ·, •
-            if re.match(r"^[-·•]\s+", r):
-                started = True
-                r = re.sub(r"^[-·•]\s+", "", r)
-                out.append(r)
-            else:
-                # accept short title-like lines only BEFORE bullets start
-                if not started and re.match(r"^[A-Z][A-Za-z0-9\s\"’\-–—]+$", r) and len(r.split()) <= 7:
-                    out.append(r)
-                elif started:
-                    break
-        # de-dupe preserving order
-        seen, uniq = set(), []
-        for x in out:
-            xl = x.strip().lower()
-            if xl not in seen:
-                uniq.append(x.strip())
-                seen.add(xl)
-        return uniq
-
-    kosshi_raw = _parse_bullets(kosshi_match.group(1) if kosshi_match else None)
-    torite_raw = _parse_bullets(torite_match.group(1) if torite_match else None)
-
-    # --- clean Kosshi: only accept kata names
-    kata_terms = ("kata", "ichimonji", "hicho", "jumonji")
-    kosshi_items = [x for x in kosshi_raw if any(t in x.lower() for t in kata_terms)]
-
-    # --- Torite target list (canonical order + robust matching)
-    torite_targets = [
-        (r"\bomote\s+gyaku\b", "Omote Gyaku"),
-        (r"\bomote\s+gyaku\s+ken\s+sabaki\b|\bken\s+sabaki\b", "Omote Gyaku Ken Sabaki"),
-        (r"\bura\s+gyaku\b", "Ura Gyaku"),
-        (r"\bmusha\s+dori\b", "Musha Dori"),
-        (r"\bganseki\s+nage\b", "Ganseki Nage"),
-    ]
-
-    # First, try to keep Torite only from the Torite section, filtered
-    torite_block_terms = ("kata", "ichimonji", "hicho", "jumonji")
-    torite_keep_terms  = ("gyaku", "dori", "nage", "sabaki")
-    torite_items = [
-        x for x in torite_raw
-        if any(t in x.lower() for t in torite_keep_terms)
-        and not any(b in x.lower() for b in torite_block_terms)
-    ]
-
-    # If Torite still empty, do a global scan across the blob in canonical order
-    if not torite_items:
-        found = []
-        for pat, canon in torite_targets:
-            if re.search(pat, blob, flags=re.I):
-                found.append(canon)
-        torite_items = found
-
-    # Final de-dupe: ensure Kosshi lines don't bleed into Torite and no repeats
-    kosshi_set = {x.lower() for x in kosshi_items}
-    seen = set()
-    torite_items = [x for x in torite_items if x.lower() not in seen and x.lower() not in kosshi_set and not seen.add(x.lower())]
-
-    # If either list is empty that's okay; don't hallucinate missing items
-    if not kosshi_items and not torite_items:
-        return None
-
-    left  = "Kosshi Kihon Sanpo" + (f" ({', '.join(kosshi_items)})" if kosshi_items else "")
-    right = "Torite Goho Gata"   + (f" ({', '.join(torite_items)})"  if torite_items else "")
-
-    return f"Kihon Happo consists of {left} and {right}."
-
-
-# -------- Robust Sanshin extractor (replacement) --------
-def _join_oxford(items: list[str]) -> str:
-    items = [x.strip() for x in items if x and x.strip()]
-    if not items:
-        return ""
-    if len(items) == 1:
-        return items[0]
-    if len(items) == 2:
-        return f"{items[0]} and {items[1]}"
-    return ", ".join(items[:-1]) + ", and " + items[-1]
-
-def _collect_after_anchor(blob: str, anchor_regex: str, window: int = 3000) -> str:
-    """Return text window after an anchor like 'Sanshin no Kata' / 'San Shin no Kata'."""
-    m = re.search(anchor_regex, blob, flags=re.I)
-    if not m:
-        return ""
-    return blob[m.end(): m.end() + window]
-
-def _parse_bullets_or_shortlines(seg: str) -> list[str]:
-    """Parse bullets (-, ·, •) or compact title-like lines; stop on blank after started."""
-    lines, started = [], False
-    for raw in seg.splitlines():
-        r = raw.strip()
-        if not r:
-            if started:
-                break
-            continue
-        if re.match(r"^[-·•]\s+", r):
-            started = True
-            r = re.sub(r"^[-·•]\s+", "", r)
-            lines.append(r)
-        else:
-            if re.match(r"^[A-Z][A-Za-z0-9\s\"’\-\(\)]+$", r) and len(r.split()) <= 8:
-                started = True
-                lines.append(r)
-            elif started:
-                break
-    out, seen = [], set()
-    for x in lines:
-        if x not in seen:
-            out.append(x); seen.add(x)
-    return out
-
-def _find_inline_list_near(blob: str, anchor_regex: str) -> list[str]:
-    """Handle 'Sanshin no Kata: Chi no Kata, Sui no Kata, ...' inline lists."""
-    m = re.search(anchor_regex + r"\s*:\s*(.+?)(?:\n\n|$)", blob, flags=re.I | re.S)
-    if not m:
-        return []
-    text = m.group(1)
-    parts = [p.strip(" -•·\t") for p in re.split(r"[,\n]", text)]
-    return [p for p in parts if p and len(p) <= 60]
-
-def try_answer_sanshin(passages: List[Dict[str, Any]]) -> str | None:
-    """
-    Deterministic Sanshin answer that survives inconsistent formatting:
-    1) Anchor match for 'Sanshin no Kata' / 'San Shin no Kata'
-    2) Parse bullets or inline lists
-    3) Fallback: scan blob for the 5 forms and output in canonical order
-    """
-    blob = "\n\n".join(p["text"] for p in passages[:6])
-    blob_low = blob.lower()
-    if not (("sanshin" in blob_low) or ("san shin" in blob_low)):
-        return None
-
-    anchor = r"(?:sanshin\s+no\s+kata|san\s+shin\s+no\s+kata|sanshin\b|san\s+shin\b)"
-
-    seg = _collect_after_anchor(blob, anchor)
-    items = _parse_bullets_or_shortlines(seg)
-
-    if not items:
-        items = _find_inline_list_near(blob, anchor)
-
-    wanted = [
-        ("chi no kata", "Chi no Kata"),
-        ("sui no kata", "Sui no Kata"),
-        ("ka no kata",  "Ka no Kata"),
-        ("fu no kata",  "Fu no Kata"),
-        ("ku no kata",  "Ku no Kata"),
-    ]
-
-    def contains(name_low: str, text: str) -> bool:
-        return name_low in text.lower()
-
-    ordered = []
-    if items:
-        for key_low, canon in wanted:
-            match = next((it for it in items if contains(key_low, it)), None)
-            if match:
-                ordered.append(match)
-        if not ordered:
-            items = []
-
-    if not items:
-        for key_low, canon in wanted:
-            pat = re.compile(rf"{key_low}", flags=re.I)
-            if pat.search(blob):
-                ordered.append(canon)
-
-    unique_ordered, seen = [], set()
-    for it in ordered:
-        base = it.strip()
-        if base.lower() not in seen:
-            unique_ordered.append(base)
-            seen.add(base.lower())
-
-    if len(unique_ordered) >= 3:
-        forms = _join_oxford(unique_ordered)
-        return f"Sanshin no Kata consists of {forms}."
-    return None
-
-def try_answer_schools(passages: List[Dict[str, Any]]) -> str | None:
-    """
-    Deterministic extractor for 'schools of the Bujinkan'.
-    Searches for a heading with 'Schools' or directly scans for the nine school names.
-    """
-    blob = "\n\n".join(p["text"] for p in passages[:8])
-    blob_low = blob.lower()
-    if "bujinkan" not in blob_low or "school" not in blob_low:
-        return None
-
-    # canonical schools list to look for (lowercase match)
-    target_schools = [
-        "togakure ryu",
-        "gyokko ryu",
-        "koto ryu",
-        "shinden fudo ryu",
-        "kukishinden ryu",
-        "takagi yoshin ryu",
-        "gyokushin ryu",
-        "kumogakure ryu",
-        "gikan ryu",
-    ]
-
-    found = []
-    for s in target_schools:
-        if s in blob_low:
-            # try to get the original casing from the text if possible
-            m = re.search(rf"({s})", blob, flags=re.I)
-            found.append(m.group(1) if m else s.title())
-
-    if found:
-        # keep order as in target list
-        return "The nine schools of the Bujinkan are: " + ", ".join(found) + "."
-    return None
-
-
 def polish_answer(raw: str, client: OpenAI, model: str) -> str:
     if not raw or len(raw) < 5:
         return raw
@@ -530,24 +287,10 @@ def answer_with_rag(question: str):
     ctx = build_context(hits)
     best = retrieval_quality(hits)
 
-    # ✅ Short-circuit for Kihon Happo
-    if re.search(r"\bkihon\s+happo\b", question, re.I):
-        fact = try_answer_kihon_happo(hits)
-        if fact:
-            return f"🔒 Strict (context-only)\n\n{fact}", hits, "{}"
-
-    # ✅ Short-circuit for Sanshin no Kata
-    if re.search(r"\bsanshin(?:\s+no\s+kata)?\b", question, re.I) or re.search(r"\bsan\s+shin\b", question, re.I):
-        fact = try_answer_sanshin(hits)
-        if fact:
-            return f"🔒 Strict (context-only)\n\n{fact}", hits, "{}"
-        
-    # ✅ Short-circuit for Schools of the Bujinkan
-    if re.search(r"\bschools?\b", question, re.I) and "bujinkan" in question.lower():
-        fact = try_answer_schools(hits)
-        if fact:
-            return f"🔒 Strict (context-only)\n\n{fact}", hits, "{}"
-    
+    # ✅ Try deterministic extractors first (Sanshin, Kihon Happo, Schools, etc.)
+    fact = try_extract_answer(question, hits)
+    if fact:
+        return f"🔒 Strict (context-only)\n\n{fact}", hits, "{}"
 
     # Decide strict vs hybrid
     weak_thresh_val = float(os.getenv("WEAK_THRESH", "0.35"))
