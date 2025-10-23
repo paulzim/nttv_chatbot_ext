@@ -15,7 +15,9 @@ langchain-text-splitters>=0.2.1
 tqdm>=4.66.0
 langchain>=0.2
 python-docx
-httpx>=0.27
+httpx<0.28
+httpcore<1.0
+
 
 # OpenAI-compatible client (works with OpenRouter or LM Studio)
 openai==1.52.2

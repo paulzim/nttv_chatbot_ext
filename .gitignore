@@ -2,3 +2,4 @@
 .venv311/Lib/site-packages/_distutils_hack/override.py
 /.venv311
 /.venv
+/.vscode

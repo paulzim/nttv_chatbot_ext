@@ -3,14 +3,10 @@ import re
 from typing import List, Dict, Any
 from .common import dedupe_preserve
 
-# Recognize rank like "8th kyu", "1st kyu", etc.
+# Recognize "8th kyu", "1st kyu", etc.
 _ORD_RE = re.compile(r"\b(\d{1,2})(st|nd|rd|th)\s+kyu\b", re.I)
 
 def _parse_rank_label(q: str) -> str | None:
-    """
-    Extract '8th kyu' style and normalize display as '8th Kyu'
-    (ordinal suffix stays lowercase, 'Kyu' capitalized).
-    """
     m = _ORD_RE.search(q)
     if not m:
         return None
@@ -18,68 +14,52 @@ def _parse_rank_label(q: str) -> str | None:
     return f"{num}{suf} Kyu"
 
 def _find_rank_positions(text: str, rank_label: str) -> list[int]:
-    """
-    Return start indices where the rank appears, tolerant to formats like:
-      - "8th Kyu"
-      - "Kyu: 8th Kyu"
-      - "Kyu : 8th Kyu | Section: Striking"
-    """
+    """Find where the rank appears (handles '8th Kyu' and 'Kyu: 8th Kyu')."""
     if not text:
         return []
-    # Accept either "... 8th Kyu ..." or "Kyu: 8th Kyu"
     pat = re.compile(
         rf"(?i)(?:\b{re.escape(rank_label)}\b|\bkyu\s*:\s*{re.escape(rank_label)}\b)"
     )
     return [m.start() for m in pat.finditer(text)]
 
-def _extract_striking_after(text: str, start_idx: int) -> str | None:
-    """
-    From a given index (rank occurrence), find the nearest 'Striking:' section that follows.
-    Capture until the next header 'Word:' on a new line, a double newline, or the next rank header.
-    Handles inline cases where '... | Section: Striking: ...' appears on the same line.
-    """
-    window = text[start_idx:start_idx + 6000]
+# Accept "Striking:", "Striking –", "Striking Techniques:", etc.
+# Up to 3 extra words allowed between "Striking" and separator
+_STRIKING_HEAD = r"striking(?:\s+\w+){0,3}\s*(?::|[-–—])\s*"
 
-    # Look for 'Striking:' directly
-    m = re.search(r"(?is)striking\s*:\s*(.*)", window)
+def _extract_striking_after(text: str, start_idx: int) -> str | None:
+    """From a rank occurrence, find next Striking header and capture its list."""
+    window = text[start_idx:start_idx + 8000]
+    m = re.search(rf"(?is){_STRIKING_HEAD}(.*)", window)
     if not m:
         return None
-
-    # Start right after 'Striking:'
     seg = m.group(1)
-
-    # Stop at next header (e.g., 'Weapon:', 'Kamae:', 'Blocking:'), next double newline, or next 'Kyu:'/'Nth Kyu'
     stop = re.search(
-        r"(?im)^\s*\w[^:\n]{0,40}:\s|^\s*$|^\s*(?:kyu\s*:|\d{1,2}(?:st|nd|rd|th)\s+kyu)\b",
-        seg
+        r"(?im)^\s*\w[^:\n]{0,40}\s*(?::|[-–—])\s*|^\s*$|^\s*(?:kyu\s*:|\d{1,2}(?:st|nd|rd|th)\s+kyu)\b",
+        seg,
     )
-    if stop:
-        return seg[:stop.start()].strip()
-    return seg.strip()
+    return seg[:stop.start()].strip() if stop else seg.strip()
 
 def _extract_striking_text_fallback(blob: str, rank_label: str) -> str | None:
-    """
-    Fallback: search the whole blob for a small window that has both the rank and a
-    nearby 'Striking:' even if they are not in strict header/section structure.
-    """
-    # Try a 'rank ... Striking:' pattern within ~2000 chars
+    """Fallback: look for 'rank ... Striking...' proximity with tolerant header."""
     pat = re.compile(
         rf"(?is)(?:{re.escape(rank_label)}|kyu\s*:\s*{re.escape(rank_label)})"
-        r".{0,2000}?striking\s*:\s*(.*?)(?=\n\s*\w[^:\n]{0,40}:\s|^\s*$|kyu\s*:|\d{1,2}(?:st|nd|rd|th)\s+kyu\b)",
-        re.M
+        rf".{{0,2500}}?{_STRIKING_HEAD}(.*?)(?=\n\s*\w[^:\n]{{0,40}}\s*(?::|[-–—])\s*|^\s*$|kyu\s*:|\d{{1,2}}(?:st|nd|rd|th)\s+kyu\b)",
+        re.M,
     )
     m = pat.search(blob)
     return m.group(1).strip() if m else None
 
 def _split_items(s: str) -> List[str]:
     """
-    Split a comma/semicolon/slash/line/“and” separated list into atomic items; strip outer parentheses.
+    Split a list tolerant to commas, semicolons, slashes, newlines, bullets (•, ・), pipes, and 'and'.
+    Strip parentheses and squash spaces.
     """
     if not s:
         return []
     s = re.sub(r"\band\b", ",", s, flags=re.I)
+    s = s.replace("•", ",").replace("・", ",").replace("|", ",")
     parts = re.split(r"[,\n;\/]+", s)
-    items: List[str] = []
+    items = []
     for part in parts:
         t = part.strip()
         if not t:
@@ -90,32 +70,52 @@ def _split_items(s: str) -> List[str]:
     return dedupe_preserve(items)
 
 def _is_kick(x: str) -> bool:
-    return "geri" in x.lower()  # e.g., yoko geri, mae geri, sokuho geri
+    return "geri" in x.lower()
 
 def _is_punch(x: str) -> bool:
     lx = x.lower()
-    return (
-        "tsuki" in lx
-        or lx.endswith(" ken")
-        or " ken " in lx
-        or "uraken" in lx
-    )
+    return ("tsuki" in lx) or lx.endswith(" ken") or (" ken " in lx) or ("uraken" in lx)
 
-# Plural-friendly intent regexes
-_KICK_INTENT = re.compile(r"\b(kick|kicks|geri|geris)\b", re.I)
+# Plural-friendly intent
+_KICK_INTENT  = re.compile(r"\b(kick|kicks|geri|geris)\b", re.I)
 _PUNCH_INTENT = re.compile(r"\b(punch|punches|tsuki|tsukis)\b|\b(?:^|[\s\-])ken\b", re.I)
-_STRIKE_INTENT = re.compile(r"\b(strike|strikes|striking)\b", re.I)
+_STRIKE_INTENT= re.compile(r"\b(strike|strikes|striking)\b", re.I)
 
 def _pick_rank_passages(passages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     rp = [p for p in passages if "rank requirements" in (p.get("source") or "").lower()]
     return rp if rp else passages
 
+def _find_striking_text(passages: List[Dict[str, Any]], rank_label: str) -> str | None:
+    """Robust multi-stage search for the Striking section of a given rank."""
+    # 1) Combined blob
+    blob = "\n\n".join(p["text"] for p in passages)
+    positions = _find_rank_positions(blob, rank_label)
+    for pos in positions:
+        st = _extract_striking_after(blob, pos)
+        if st:
+            return st
+    st = _extract_striking_text_fallback(blob, rank_label)
+    if st:
+        return st
+    # 2) Per-passage
+    for p in passages:
+        txt = p["text"]
+        positions = _find_rank_positions(txt, rank_label)
+        for pos in positions:
+            st = _extract_striking_after(txt, pos)
+            if st:
+                return st
+        st = _extract_striking_text_fallback(txt, rank_label)
+        if st:
+            return st
+    return None
+
 def try_answer_rank_striking(question: str, passages: List[Dict[str, Any]]) -> str | None:
     """
     Answers:
-      - 'What are the kicks in 8th kyu?' / 'What kicks do I need to know for 8th kyu?'
+      - 'What are the kicks in 8th kyu?'
       - 'What are the punches in 8th kyu?'
-      - 'What is the striking in 8th kyu?' (returns both buckets)
+      - 'What is the striking in 8th kyu?' (returns both)
     """
     ql = question.lower()
     rank_label = _parse_rank_label(ql)
@@ -124,39 +124,10 @@ def try_answer_rank_striking(question: str, passages: List[Dict[str, Any]]) -> s
 
     wants_kicks   = bool(_KICK_INTENT.search(ql))
     wants_punches = bool(_PUNCH_INTENT.search(ql))
-    # If neither kicks nor punches explicitly asked but 'striking' is, return both.
     wants_strikes = bool(_STRIKE_INTENT.search(ql)) or (not wants_kicks and not wants_punches)
 
-    # Prefer the rank requirements file
     rank_passages = _pick_rank_passages(passages)
-
-    # Try to find 'Striking:' near a rank mention (robust to inline formatting)
-    blob = "\n\n".join(p["text"] for p in rank_passages)
-    positions = _find_rank_positions(blob, rank_label)
-    striking_text = None
-
-    for pos in positions:
-        striking_text = _extract_striking_after(blob, pos)
-        if striking_text:
-            break
-
-    if not striking_text:
-        # Fallback: global scan for 'rank ... Striking: ...'
-        striking_text = _extract_striking_text_fallback(blob, rank_label)
-
-    if not striking_text:
-        # Last-chance: scan each passage separately (handles cases where chunking splits)
-        for p in rank_passages:
-            positions = _find_rank_positions(p["text"], rank_label)
-            for pos in positions:
-                striking_text = _extract_striking_after(p["text"], pos)
-                if striking_text:
-                    break
-            if not striking_text:
-                striking_text = _extract_striking_text_fallback(p["text"], rank_label)
-            if striking_text:
-                break
-
+    striking_text = _find_striking_text(rank_passages, rank_label)
     if not striking_text:
         return None
 
@@ -176,7 +147,7 @@ def try_answer_rank_striking(question: str, passages: List[Dict[str, Any]]) -> s
     if parts:
         return " ".join(parts)
 
-    # Graceful fallback if they asked specifically for one kind but found none
+    # If they asked for only one category and we found none, answer gracefully
     if wants_kicks and not kicks:
         return f"{rank_label} kicks: (none listed)."
     if wants_punches and not punches:

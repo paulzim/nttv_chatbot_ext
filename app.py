@@ -1,5 +1,5 @@
 # app.py — Streamlit RAG with priority-aware retrieval, strict prompt,
-# now using modular extractors (Sanshin, Kihon Happo, Schools)
+# now using modular extractors (Sanshin, Kihon Happo, Schools) + Rank injector
 import os, pickle, json, re
 from pathlib import Path
 from typing import List, Dict, Any
@@ -16,7 +16,6 @@ from extractors import try_extract_answer
 
 # ✅ Force CPU for embeddings (important on Windows/PyTorch)
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
-
 
 # ------------- Config / env -------------
 load_dotenv()
@@ -45,10 +44,6 @@ if not (FAISS_PATH.exists() and META_PATH.exists() and CFG_PATH.exists()):
 with open(CFG_PATH, "r", encoding="utf-8") as f:
     cfg = json.load(f)
 EMBED_MODEL_NAME = cfg.get("embed_model", "sentence-transformers/all-MiniLM-L6-v2")
-
-# Force CPU to avoid meta device issues on Windows/PyTorch 2.5+
-import os
-os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
 
 EMBED_MODEL = SentenceTransformer(EMBED_MODEL_NAME, device="cpu")
 
@@ -179,6 +174,66 @@ def retrieval_quality(hits):
         return 0.0
     return max(h.get("rerank_score", h.get("score", 0.0)) for h in hits)
 
+# --- Helper: ensure Rank Requirements text is available to extractors ---
+def _find_rank_file_text() -> tuple[str | None, str | None]:
+    """
+    Search common locations for the rank requirements file and return (text, path).
+    Looks under ./data and project root, case-insensitive patterns.
+    """
+    candidates = []
+    root = ROOT
+    data_dir = root / "data"
+    patterns = [
+        "nttv rank requirements.txt",
+        "rank requirements.txt",
+        "*rank*requirements*.txt",
+    ]
+    search_dirs = [data_dir, root]
+    seen = set()
+    for d in search_dirs:
+        if not d.exists():
+            continue
+        for pat in patterns:
+            for p in d.glob(pat):
+                lp = str(p).lower()
+                if lp in seen:
+                    continue
+                seen.add(lp)
+                try:
+                    txt = p.read_text(encoding="utf-8", errors="replace")
+                    if txt and "kyu" in txt.lower():
+                        return txt, str(p)
+                except Exception:
+                    pass
+    return None, None
+
+def inject_rank_passage_if_needed(question: str, hits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    If the user asked a 'kyu' question and none of the top hits are the Rank Requirements,
+    prepend a synthetic passage containing the full rank file so extractors can work.
+    """
+    if "kyu" not in question.lower():
+        return hits
+
+    has_rank = any("rank requirements" in (h.get("source") or "").lower() for h in hits)
+    if has_rank:
+        return hits
+
+    txt, path = _find_rank_file_text()
+    if not txt:
+        return hits
+
+    # Make a synthetic high-priority passage at the front
+    synth = {
+        "text": txt,
+        "meta": {"priority": 1, "source": path},
+        "source": path,
+        "page": None,
+        "score": 1.0,
+        "rerank_score": 999.0,  # ensure it’s at the top for extractors
+    }
+    return [synth] + hits
+
 # ------------- Prompting + LLM call -------------
 STRICT_SYSTEM = (
     "You are the NTTV assistant. Answer ONLY from the provided context.\n"
@@ -196,14 +251,15 @@ HYBRID_SYSTEM = (
 )
 
 def build_user_prompt(question, passages):
-    # Limit context even more for rank-specific questions
-    ctx_limit = 3 if "kyu" in question.lower() else 4
+    # Use a bit more context for rank questions
+    ctx_limit = 6 if "kyu" in question.lower() else 4
     ctx = "\n\n".join(p["text"] for p in passages[:ctx_limit])
     return (
         "Answer the question using ONLY the context.\n"
         "Return exactly one or two sentences, no bullets, no intro phrases.\n\n"
         f"QUESTION:\n{question}\n\nCONTEXT:\n{ctx}\n\nANSWER:\n"
     )
+
 
 def clean_answer(s: str) -> str:
     s = s.strip()
@@ -291,12 +347,21 @@ def polish_answer(raw: str, client: OpenAI, model: str) -> str:
         return raw
 
 def answer_with_rag(question: str):
+    # 🔹 Overfetch more when the query mentions "kyu" (ranks)
+    k = TOP_K
+    if "kyu" in question.lower():
+        k = max(TOP_K * 3, TOP_K + 6)
+
     # Retrieve
-    hits = retrieve(question, k=TOP_K)
+    hits = retrieve(question, k=k)
+
+    # 🔹 Ensure rank file is present for kyu-style questions
+    hits = inject_rank_passage_if_needed(question, hits)
+
     ctx = build_context(hits)
     best = retrieval_quality(hits)
 
-    # ✅ Try deterministic extractors first (Sanshin, Kihon Happo, Schools, etc.)
+    # ✅ Try deterministic extractors first (Sanshin, Kihon Happo, Schools, Rank-Striking, etc.)
     fact = try_extract_answer(question, hits)
     if fact:
         return f"🔒 Strict (context-only)\n\n{fact}", hits, "{}"
