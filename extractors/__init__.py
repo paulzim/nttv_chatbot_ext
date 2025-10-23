@@ -5,27 +5,26 @@ from typing import List, Dict, Any
 from .kihon_happo import try_answer_kihon_happo
 from .sanshin import try_answer_sanshin
 from .schools import try_answer_schools
-from .rank import try_answer_rank_striking   # rank-aware kicks/punches/striking
+from .rank import try_answer_rank_striking  # kicks/punches/striking by rank
 
-# Plural-friendly token pattern for striking intent in rank questions
-_STRIKE_INTENT_RE = re.compile(
+# Very tolerant detectors
+_RANK_ANY   = re.compile(r"\b\d{1,2}(?:st|nd|rd|th)\s+kyu\b", re.I)
+_STRIKE_ANY = re.compile(
     r"\b("
-    r"kick|kicks|geri|geris|"
-    r"punch|punches|tsuki|tsukis|"
+    r"kicks?|geri|geris|"
+    r"punch(?:es)?|tsuki|tsukis|uraken|"
     r"strikes?|striking|"
-    r"(?:^|[\s\-])ken\b"          # ...-ken / ' ken ' / line-start ken
+    r"(?:^|[\s\-])ken\b"   # matches “-ken” terms as a word
     r")\b",
     re.I,
 )
-
-_RANK_RE = re.compile(r"\b\d{1,2}(?:st|nd|rd|th)\s+kyu\b", re.I)
 
 def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> str | None:
     """Route core questions to deterministic extractors; return None if no match."""
     ql = question.lower()
 
-    # ✅ Rank-specific striking (kicks/punches/striking for Nth kyu)
-    if _RANK_RE.search(ql) and _STRIKE_INTENT_RE.search(ql):
+    # ✅ Always try rank striking first if the question mentions a rank and any striking term
+    if _RANK_ANY.search(ql) and _STRIKE_ANY.search(ql):
         ans = try_answer_rank_striking(question, passages)
         if ans:
             return ans
@@ -45,6 +44,12 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> str | N
     # Schools of the Bujinkan
     if "bujinkan" in ql and re.search(r"\bschool", ql):
         ans = try_answer_schools(passages)
+        if ans:
+            return ans
+
+    # 👉 Safety net: if “kyu” appears at all, still try the rank extractor (helps looser queries)
+    if "kyu" in ql:
+        ans = try_answer_rank_striking(question, passages)
         if ans:
             return ans
 
