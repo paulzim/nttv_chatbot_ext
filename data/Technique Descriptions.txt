@@ -1,0 +1,531 @@
+Technique Descriptions
+
+---
+
+Ninjutsu Joint Locks: Principles, Applications, and Variations
+
+A joint lock (関節技 kansetsu-waza), (擒拿 Chin na, Qin na), is a martial arts technique that manipulates an opponent's joint and brings it to the limit of its natural range of motion. The technique allows for controlled application of force, as in low level of violence, providing options from mild restraint to severe joint damage.
+
+Fundamental Concepts
+Joint locks function by isolating a joint and applying force in a direction that exceeds its anatomical limitations. Effectiveness depends on proper alignment, leverage, and biomechanical advantage rather than raw strength.
+
+The human body has evolved with specific joint limitations as protection mechanisms. Joint locks exploit these natural constraints. Each joint features a unique structure of ligaments, tendons, and bone formations that determine its mobility range and vulnerability points.
+
+Strategic Applications
+Joint locks serve multiple functions:
+
+Control without permanent injury
+Immobilization for restraint
+Pain compliance
+Structural compromise for combat situations
+In combat systems, joint locks often function as transitional techniques, creating openings for follow-up strikes or takedowns. Their dual capacity for restraint or damage makes them versatile in various threat scenarios.
+
+Technical Execution
+Successful joint lock application requires:
+
+Proper positioning relative to opponent
+Breaking opponent's balance (kuzushi)
+Securing control points above and below target joint
+Applying force along the path of least resistance
+Maintaining structural alignment for maximum leverage
+Neurological Effects
+Beyond mechanical control, joint locks trigger neurological responses. When a joint approaches its maximum range, proprioceptors signal potential damage, creating involuntary protective tension and pain response. This neurological component often produces compliance before structural damage occurs.
+
+Classification by Target Joint
+Upper Limb Locks
+Finger locks: Digital manipulation provides subtle control points. In Ninjutsu: Yubi Kudaki etc.
+Wrist locks: Small joint with complex movement planes. In Ninjutsu: Ura Gyaku, Omote Gyaku, Take Ori, Hon Gyaku Jime, Take ori etc.
+Elbow locks: Primarily exploit the hinge joint's limited planes of motion. In Ninjutsu: Seoe, Waki Gatame, Musha dori, te Makura etc.
+Shoulder locks: Target the most mobile joint in the body with multiple vulnerability points. In Ninjutsu: Oni Kudaki, Gosha dori, Ura oni Kudaki, O Gyaku, Ude garame
+Lower Limb Locks
+Ankle locks: Exploit the limited rotation of this weight-bearing joint
+Knee locks: Target the body's largest and most structurally vulnerable joint
+Hip locks: Less common due to the joint's strength but effective when properly applied
+Spinal Locks
+Neck cranks: High-risk techniques that compress or rotate cervical vertebrae
+Spinal twists: Apply rotational or compressive force to thoracic or lumbar regions
+Cultural Variations
+Different martial traditions have developed unique approaches to joint locking:
+
+Japanese systems (Judo, Aikido, Jujutsu): Emphasize refined technique and minimal force
+Chinese methods (Chin Na): Focus on meridian points and energy disruption alongside mechanical control
+Korean arts (Hapkido): Blend circular motion with precise joint manipulation
+Filipino systems: Integrate locks with weapons and fluid transitional movement
+Russian systems (Sambo): Emphasize practical combat application and pain compliance
+Training Methodology
+Effective joint lock training balances several considerations:
+
+Progressive resistance to build sensitivity and control
+Understanding anatomical thresholds without crossing them
+Developing tactile awareness of joint alignment
+Cultivating precision in application angles
+Ethical and Legal Dimensions
+Joint locks occupy a complex position in use-of-force continuums. They can provide non-lethal control options but also risk permanent injury if misapplied. Law enforcement and security contexts require careful consideration of appropriate force levels relative to the situation.
+
+In traditional martial contexts, joint locks represent the principle of controlling without necessarily destroying—an embodiment of martial restraint and technical sophistication that transcends mere violence.
+
+List of arm locks and Joint locks:
+  Ganseki-Ninjutsu underhook
+  Hon gyaku jime, wrist torsion break
+  Jigoku Dori, advanced lock 
+  Kakae hiji dori - first policemen hold
+  Kubi Kudaki, twisting neck break lock 
+  Musha dori, underarm shoulder lock 
+  Muso dori, elbow break, Ninjutsu
+  Omote Gyaku Ken Sabaki, twisting wrist lock from a punch 
+  Omote gyaku, outer wrist lock 
+  Oni kudaki, shoulder lock 
+  Oya goroshi, thumb break 
+  Second policeman hold 
+  Seoi
+  Shoulder lock with a short chain, Ura Oni Kudaki to manrikigusari 
+  Take ori
+  Te hodoki, hand release 
+  Te makura
+  Teki otoshi, Large shoulder break 
+  Third policemen hold
+  Ude Garame, reverse shoulder lock 
+  Ura gosha dori
+  Ura gyaku, inner wrist lock 
+  Ura oni kudaki
+  Waki Gatame
+  Yubi kudaki, finger breaking 
+  Horadat Zakif
+  Shita mawashi dori - Double hand release
+  Tai Hodoki - Escape from front bear hug
+  Tai hodoki - Escape from rear bear hug
+  Tai Hodoki, Body escape 
+  Te hodoki - Hakucho - hand release
+  Te hodoki - Kenka yotsu
+  Te hodoki - Omote gyaku
+  Te hodoki - Ura gyaku
+  Te hodoki, hand release 
+  Uchi mawashi dori - Single hand release
+  Americana from sitting guard
+  Cutting armbar from sitting guard
+  Juji gatame
+  Juji gatame - Arm bar - from knee on stomach
+  Juji gatame - Arm bar - from mount
+  Juji gatame - Arm bar - from the guard
+  Keylock - Oni kudaki - from mount
+  Keylock - Oni kudaki - from side control
+  Keylock on the shoulder from guard using the leg
+  Kimura - Ude garame - from side control
+  Kimura - Ude garame - from the guard
+  Omoplata - Leg shoulder lock
+  Submissions from the guard drill
+
+----
+
+Ninjutsu Throws
+
+Introduction
+Ninjutsu Throws (投げ技) are specialized techniques that use grappling to unbalance a combatant. Unlike sport-oriented martial arts, Ninjutsu throws are designed with combat effectiveness as their primary goal, often deliberately projecting the opponent onto their head to maximize impact and neutralize threats.
+
+Throwing Categories
+Throws in Ninjutsu utilize opponent unbalancing through several distinct methods:
+
+Foot Techniques (Ashi-waza)
+Using the legs to block the opponent's legs while applying a pushing or pulling action to the torso. These throws are called Foot Techniques (Ashi waza‎).
+
+Hand Techniques (Te-waza)
+Using the hands with a strong pulling or pushing action to unbalance the opponent in such a way that they cannot correct their center of balance by stepping. These throws are grouped as Hand Techniques (Te waza).
+
+Hip Techniques (Koshi-waza)
+Using the hips as a fulcrum point to rotate or lift and rotate the opponent's torso or waist. These throws are called Hip Techniques (Koshi waza).
+
+Sacrifice Techniques (Sutemi-waza)
+If the act of unbalancing and throwing necessitates an intentional falling action by the thrower, then the throw is considered a Sacrifice Throw (Sutemi waza).
+
+Unique Aspects of Ninjutsu Throws
+Strike-Integrated Kuzushi
+A distinctive feature of Ninjutsu throwing techniques is the integration of strikes and kicks into the kuzushi (balance breaking) phase. Unlike pure grappling arts that rely solely on pushing, pulling, or redirecting force, Ninjutsu practitioners use atemi (striking) techniques to create openings, disrupt the opponent's structure, and facilitate throws. This approach makes Ninjutsu throws particularly effective in combat situations where an opponent is actively resisting or attacking.
+
+Throw-Lock Relationship
+Ninjutsu recognizes and exploits the dynamic relationship between throws and joint locks. When an opponent resists a throw attempt, their defensive posture often creates vulnerabilities for joint lock applications. Conversely, resistance against a joint lock frequently opens opportunities for throwing techniques. This interconnected approach allows practitioners to flow between throwing and locking techniques based on the opponent's reactions, making Ninjutsu a highly adaptable combat system.
+
+Head Targeting
+While many sport-oriented martial arts emphasize safe landing for the opponent, Ninjutsu throws are often specifically designed to project the opponent onto their head or neck. This combat-focused approach aims to maximize the impact and potentially incapacitate an attacker in self-defense situations. This tactical difference reflects Ninjutsu's historical development as a battlefield martial art rather than a competitive sport.
+
+Judo Influence in Ninjutsu
+Judo background is evident in the refined throwing mechanics and technical precision found in Ninjutsu systems. The synthesis of traditional Ninjutsu principles with Judo's systematic approach to throwing techniques has created a uniquely effective methodology that preserves combat effectiveness while adding technical sophistication.
+
+Execution Principles
+Effective Ninjutsu throws incorporate several key elements:
+
+Kuzushi (Balance Breaking): Creating instability in the opponent's posture through strikes, positioning, or mechanical advantage
+Tsukuri (Entry): Proper body positioning to maximize leverage and minimize the opponent's defensive options
+Kake (Execution): The technical application that completes the throw with optimal force and directional control
+Zanshin (Continued Awareness): Maintaining combat readiness throughout and after the throw execution
+The combat orientation of Ninjutsu throwing techniques is evident in their emphasis on controlling the opponent's landing position and impact angle, particularly when directing the fall toward vulnerable areas like the head or spine. This approach stands in contrast to sport-oriented throwing systems that prioritize clean execution and competition scoring.
+
+
+Complete List of Ninjutsu Throws
+Gan seki otoshi
+Ganseki-Ninjutsu underhook
+Kata guruma, Ninjutsu - Shoulder wheel
+Kibisu Gaeshi - Heel trip reversal
+Kosoto Gake - Minor outer hook
+Kosoto gari - Minor outer clip
+Kouchi gake - Minor inner hook
+Kouchi gari - Small inner reap
+O guruma - Large wheel
+Okuri ashi Harai - Foot sweep
+Osoto gari - Large outer reap
+Osoto Guruma - Big outer wheel
+Osoto Otoshi - Big outer drop
+Ouchi gari - Major inner reap
+Sasai tsurikomi ashi - Propping and drawing ankle throw
+Tsubame Gaeshi - Swallow counter
+Uchimata - Inner-thigh reaping throw
+Uchimata, inner leg throw 
+Hane goshi - Spring hip throw
+Harai goshi - Sweeping hip throw
+Koshi guruma - Hip wheel
+Koshi Nage - Full waist throw
+O Goshi - Full hip throw
+Sode Tsurikomi Goshi - Sleeve lift and pulling hip throw
+Tsuri Goshi - Lifting hip throw
+Tsurikomi Goshi - Lifting and pulling hip throw
+Uki Goshi - Floating half-hip throw
+Ushiro Goshi - Rear throw
+Kani Basami - Crab or scissors throw
+Kawazu Gake - One-leg entanglement
+Osoto Makikomi - Big outer wraparound
+Soto Makikomi - Outer wraparound
+Sumi gaeshi - Corner reversal
+Tani otoshi - Valley drop
+Tawara Gaeshi - Rice bag reversal throw
+Tomoe nage - Circle throw
+Uchi Mata Makikomi - Inner thigh wraparound
+Uki Waza - Floating drop
+Ura nage - Rear throw
+Yoko Gake - Side drop
+Yoko Guruma - Side wheel
+Yoko sutemi - Side sacrifice
+Yoko Tomoe nage, Side sacrifice throw
+Yoko Wakare - Side separation
+Drop Morote Seoi nage - Kneeling shoulder drop
+Ippon seoi nage - One arm shoulder throw
+Kata guruma, Judo - Shoulder wheel
+Kouchi Gaeshi - Small inner reap counter
+Kubi Kyukei nage - Neck breaking throw
+Kubi nage - Neck throw
+Kuchiki Taoshi - One-hand drop
+Morote Gari - Two-hand reap
+Obi Otoshi - Belt throw
+Seoe
+Seoi Nage - Lifting shoulder throw
+Sukui Nage - Scoop throw
+Sumi Otoshi - Corner drop
+Tai otoshi - Body drop
+Uki Otoshi - Floating drop
+Yama Arashi - Mountain storm throw
+
+---
+
+Ninjutsu Kicks
+
+Introduction
+Kicks, 蹴り, in Martial arts refer to all manners of techniques used to strike the opponent using the legs, knees included.
+
+Ninjutsu Kicking Methodology
+Ninjutsu kicks differ from those in sport-oriented martial arts through several distinct characteristics:
+
+Anatomical Targeting: Kicks aim for vulnerable points like joints, nerve clusters, and internal organs
+Penetrating Force: Emphasis on transferring energy deep into targets rather than surface impact
+Combat Integration: Kicks function within tactical frameworks rather than as isolated techniques
+Contextual Adaptation: Application varies based on distance, terrain, and opponent positioning
+Biomechanical Principles
+Effective Ninjutsu kicks rely on specific mechanical concepts:
+
+Structure Alignment: Position of supporting leg, hip rotation, and upper body orientation determines kick effectiveness
+Impact Surface Selection: Different parts of the foot or leg are selected based on target vulnerability
+Retraction Efficiency: Kicks are designed for rapid recovery to maintain tactical advantage
+Ground Force Transmission: Power generated from the ground travels through body linkages into the target
+
+
+Primary Kick Classifications
+
+Forward Kicks
+Forward kicks include:
+
+Mae Geri (Front Kick): Direct forward thrust using ball of foot or heel
+Hiza Geri (Knee Strike): Close-range upward or forward strike with the knee
+Zenpo Geri (Penetrating Kick): Historically used for breaking barriers, delivers concentrated force with ball of foot
+
+
+Circular Kicks
+Circular kicking techniques include:
+
+Mawashi Geri (Roundhouse Kick): Arc motion using shin or instep, modified in Ninjutsu to penetrate rather than slap
+Ura Mawashi Geri (Reverse Roundhouse): Reverse arc using sole or heel, often targeting head or neck
+Mikazuki Geri (Crescent Kick): Upward arc using inside or outside edge of foot
+
+
+Linear Kicks
+Linear kicks include:
+
+Sokuho Geri (Side Kick): Lateral strike with heel, edge of foot, or sole
+Kakato Geri (Heel Kick): Downward or angled strike using heel as impact point
+Koho Geri (Back Kick): Rear-facing kick useful against pursuing opponents
+
+Technical Considerations
+Key aspects for effective Ninjutsu kick execution:
+
+Distance Management: Each kick has optimal distance parameters for maximum effect
+Height Selection: Target height determined by tactical objective, not aesthetic preference
+Telegraphing Reduction: Minimal preparation movement to prevent opponent anticipation
+Follow-up Positioning: Each kick concludes in position advantageous for subsequent techniques
+
+Combat Applications
+Ninjutsu kicks serve specific tactical functions:
+
+Defensive Spacing: Creating distance from aggressive opponents
+Offensive Entry: Breaking opponent's guard or creating openings
+Mobility Disruption: Targeting legs to impair opponent movement
+Structural Damage: Compromising opponent's skeletal alignment or balance
+
+Complete List of Ninjutsu Kicks
+
+Ago kin geri - heel kick to chin
+Alternating front knees in a clinch
+Crescent strike kick, Mikazuki Sokushi geri 
+Front knee, Mae hiza geri 
+Gedan mawashi geri
+Gedan sokugyaku geri, front push kick to hip, Ninjutsu
+Hane geri, Blade of foot front kick
+Happō Keri – Eight-directional kicking
+Kakato kobura geri, heel kick to common peroneal nerve
+Kinteki sokushi geri - Kick to the groin
+Mae geri - Front kick with ball of foot
+Mae sokuto geri, front hip joint kick
+Mae tobi geri - Front scissor kick with ball of foot
+Mawashi geri, roundhouse kick
+Mikazuki geri - slap kick
+Ono geri - axe kick to head
+Sokugyaku geri - heel kick
+Sokushi
+Spinning rear push kick, Ushiro mawashi geri 
+Spinning ura mawashi kick
+Tobi geri taihen - Jumping front kick
+Tobi mawashi geri - jumping mawashi to the chest
+Two leg jumping push kick 
+Ura ashi geri - Sole of foot kick to the groin
+Ura mikazuki geri - inside slap kick
+Ushiro geri, back kick
+Yoko sokugyaku geri kekomi - Side push kick
+Yoko sokuto geri, side knee kick
+
+---
+
+Ninjutsu Punches and Strikes
+
+Punches are the intentional delivery of strikes in fighting, martial arts and combat sports that use the hand, fists, elbows, headbutts and full body strikes.
+
+Ninjutsu Striking Methodology
+Ninjutsu striking differs from sport fighting through several key aspects:
+
+Anatomical Weapons: Strikes utilize specific parts of the hand and arm—knuckles, palm heel, hammer fist, forearm, elbow
+Target Selection: Focus on vulnerable anatomical points rather than general areas
+Force Delivery: Emphasis on penetration and structural disruption instead of surface impact
+Tactical Purpose: Strikes function as control mechanisms, not solely for damage infliction
+
+
+Biomechanical Principles
+Effective strikes in Ninjutsu depend on:
+
+Ground Connection: Force generation begins with proper foot positioning and ground pressure
+Kinetic Linking: Energy transfers through aligned skeletal structure from legs through torso to striking limb
+Body Unity: Coordinated movement of multiple body segments creates force multiplication
+Structural Alignment: Proper bone alignment prevents energy leakage and injury to the striker
+Core Striking Classifications
+
+
+Fist Strikes
+Primary fist techniques include:
+
+Tsuki (Shikan ken): Direct linear force delivery using first two knuckles
+Fudo Ken, Gyaku Tsuki (Reverse Punch): Power punch from rear hand with hip rotation
+Shuto: Quick side hand strike for distancing and knock-out
+Happa, or Mawashi Tsuki (Hook): Circular punch with open hand or a fist targeting side areas
+Age Tsuki (Uppercut): Upward trajectory strike to chin or solar plexus
+
+Open Hand Strikes
+Open hand techniques include:
+
+Shotei (Palm Heel): Base of palm strike effective for head targets and safer for striker
+Shuto (Knife Hand): Edge of hand strike targeting neck, collarbone, or limbs
+Haito (Ridge Hand): Thumb-side edge strike to throat and other vulnerable points
+Nukite (Finger Strike): Focused penetration using fingertips to soft targets
+Kumate (Bear paw Strike): For Kuzushi, blinding or appropriate level of violence
+
+
+Forearm and Elbow Strikes
+Secondary arm weapons include:
+
+Hijiken or empi (Elbow Strike): Multiple-angle strikes using the point or edge of elbow
+Kote (Forearm Strike): Striking with forearm bone for blocking or attacking
+
+
+Technical Considerations
+Optimizing Ninjutsu striking requires attention to:
+
+Distance Management: Each strike has optimal range parameters
+Impact Timing: Strikes land at maximum acceleration point for penetration
+Recovery Position: Follow-through position enables immediate defensive or offensive options
+Breathing Coordination: Exhalation timing synchronized with strike impact
+
+
+Combat Applications
+Ninjutsu strikes serve multiple tactical functions:
+
+Disruptive Striking: Breaking opponent's structure and balance
+Setup Techniques: Creating openings for subsequent techniques
+Nerve Point Targeting: Striking specific anatomical vulnerabilities for systemic effect
+Defensive Counters: Converting defensive movements into simultaneous attacks
+
+
+Training Methods
+Development of striking skills progresses through:
+
+Form Practice: Basic mechanics without resistance
+Impact Training: Force delivery against striking implements
+Partner Drills: Controlled application with feedback
+Tactical Integration: Combining strikes with movement, throws, and joint manipulations
+
+---
+
+Karuwaza (Kyokugei - 曲芸) category lists the basic Ninjutsu acrobatics and three dimensional combat orientation techniques. In the Ninja Training TV curriculum, these are part of Kaiten (rolls).
+
+ Koho tenkai - Back hand spring from omote gyaku
+  Koho tenkai with koho tombogaeri - somersault
+  Koho tombogaeri - Back somersault against an opponent
+  Koho tombogaeri - Back somersault against gosha dori
+  Koho tombogaeri - Back somersault against koshi nage
+  Koho tombogaeri - Back somersault from oni kudaki
+  Oten - Cartwheel
+  Shikko- Knee Walking
+  Shoten - Wall running
+  Shoten tombogaeri - Back somersault from wall running
+  Zenpo tenkai - forward handspring
+  Zenpo tenkai - Front hand spring agaisnt ura gyaku
+  Zenpo tenkai - one hand forward handspring
+  Zenpo tombogaeri - forward somersault
+  Zenpo tombogaeri - Front somersault against morote seoe nage
+  Kiten- Flips
+  Kuten- Handsprings
+  Shoten No Jutsu- Ascending to the Heavens (climbing man-made objects)
+  Noburi Gata- Climbing Natural Objects
+
+---
+
+Kaiten - rolls
+
+Gyaku nagare - rolling from Ichi Monji no kamae 
+Hicho kaiten - Jumping front roll
+Koho kaiten - rolling backward
+Sokuho kaiten - rolling to the side
+Tobi zenpo kaiten usiro - turn jump and roll
+Yoko nagare - diagonal back roll
+Zenpo kaiten - rolling forward
+Zenpo Kaiten Naname- Forward Diagonal Roll
+Zenpo Kaiten Ukemi - forward rolling breakfall
+
+---
+
+Tai Sabaki - Evasion and attack movements
+
+  Tai sabaki - Movement and evasion
+  Aruki, walking step movement in combat
+  Moving diagonally back, Naname ushiro sabaki 
+  How to do a backward tai sabaki over rough terrain, Ushiro aruki naname tobi tai sabaki
+  Back sliding step evasion, Ushiro sabaki 
+  Combat walk and diagonal back jump, Ushiro aruki naname tobi tai sabaki
+  Happo tenchi tobi - 10 directions jumping sabaki
+  Moving to the side, yoko tai sabaki 
+  Naname ushiro sabaki - Diagonal evasion from seza
+  Naname ushiro sabaki - Diagonaly back from fudoza
+  Omote Shuto tobi - Hitting the neck and jumping back
+  Tsuki, back punch with a step, Ninjutsu
+  Ura shuto tobi - Hitting the neck from the inside and jumping back
+  Yoko Aruki- Sideways Walking
+  Shinobi Aruki- Silent Walking
+
+---
+
+Ukemi - breakfalls
+
+Ukemi (受身), or "receiving the throw/attack", is the art of knowing how to land or fall and recover correctly from a martial arts technique with minimal impact.
+
+Zenpo Ukemi- Forward Breakfall
+Koho Ukemi- Backward Breakfall
+Yoko Ukemi- Sideways Breakfall
+Yoko Nagashi Zenpo Ukemi- Sideways Flowing Forward Breakfall
+
+---
+
+Shiho Tenchi Tobi- The Four Ways of Heaven/Earth Leaping
+· Zenpo Tobi- Forward Leap
+· Koho Tobi- Backward Leap
+· Migi Tobi- Right Leap
+· Hidari Tobi- Left Leap
+· Fudoza Tobi- Immovable Seat Leap
+· Chi Tobi- Earth Leap
+
+---
+
+Hajutsu Koho –The Eight Techniques and the Nine Ways
+Tehodoki- Wrist Escapes
+· Katate- One Hand, Same Side
+· Gyakute- One Hand, Cross Side
+· Morote- Both Hands
+· Ryote- Two Hands
+Taihodoki- Body Escapes
+· Oyagoroshi- Killing the Parent
+· Kogagoroshi- Killing the Child
+· Taihodoki- Body Escape
+· Koshi kudaki- Hip Crush
+· Happo keri henka no kote- Eight Way Changing Kicks
+
+---
+Kihon Happo: consists of Kosshi Kihon Sanpo and Torite Goho Gata.
+Kosshi Kihon Sanpo:
+- Ichimonji no Kata
+- Hicho no Kata 
+- Jumonji no Kata
+Torite Goho Gata:
+- Omote Gyaku – External reversal
+- Omote Gyaku Ken Sabaki – External reversal with a punch (tsuki)
+- Ura Gyaku  - Internal reversal
+- Musha Dori – "capturing a warrior"
+- Ganseki Nage – "Throwing a heavy rock"
+
+The 3 katas of the KOSSHI KIHON SANPO:
+1. Ichimonji no Kata:
+
+In a right posture: right ichimonji, in which the right hand is extended forward, the left hand is fisted with the thumb sticking out and placed above the elbow joint of the right arm.
+
+Rotate the right hand in a large circular motion to the right (rotate clockwise, from the hips towards the left shoulder). As you rotate the arm, be sure to raise the left fist and this will help to thwart the opponent's attack.
+
+The left-hand rises above the head, the palm is half-opened and strikes the Omote-shuto on the right side of the opponent's neck at the same time as you step forward with the left foot.
+
+
+2. Hicho no Kata: 
+
+Lift your left leg to the knee area of ​​your right leg. left hand half open and outstretched; The right hand is fisted with the thumb open and placed in the area of ​​the left elbow.
+
+Turn the left hand to the right, clockwise, and continue to the left and down without changing the position. As before [see Ichimonji no kata] the hands change position, with the right hand coming up to the head and semi-fisted.
+
+The left leg kicks into the opponent's suigetsu (water moon - this point is just below the xiphoid, sternum ridge, this is the solar plexus. This area affects the diaphragm when striking) or to the Asagasumi (chin) as you move forward.
+
+Partially open (half) the right hand and strike the omote-shuto into the artery on the right side of the opponent's neck. Note: the movement of the hand reaches from the right thigh area to the left shoulder area and leaves from there.
+
+3. Jumonji no Kata:
+
+Position yourself in Jumonji with an inside left hand.
+
+When the opponent attacks with a tski: strike with the right hand daken (as it is) to the upper right corner (in front of the attacker's hand) and continue with a boshi jab into the opponent's chest area (with the right thumb). Raise the half-open hand to the right side and step back with a tai-sabaki to the left side and back.
+
+Turn the left hand as it is to the upper left and continue with a blow into the opponent's right chest area with the left thumb (left boshi...). Perform a half opening to the right side, lifting and retracting in a backward tai-sabaki and finishing in a jumonji.
+

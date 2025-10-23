@@ -1,0 +1,23 @@
+openai>=1.40.0
+python-dotenv>=1.0.1
+pypdf>=4.2.0
+sentence-transformers>=3.0.0
+faiss-cpu>=1.8.0
+langchain-text-splitters>=0.2.1
+streamlit>=1.36.0
+tqdm>=4.66.0
+langchain>=0.2
+langchain-text-splitters>=0.2
+python-docx
+httpx>=0.27
+
+# REQUEST_TIMEOUT=180
+# MAX_RETRIES=2
+# TOP_K=12
+# MAX_TOKENS=512
+
+# USE_CHAT_ONLY=true
+
+
+# SEED_POLICY=always   # always add seed chunks to pool
+
