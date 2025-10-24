@@ -271,6 +271,23 @@ def build_user_prompt(question: str, passages: List[Dict[str, Any]]) -> str:
         "Return exactly one or two sentences, no bullets, no intro phrases.\n\n"
         f"QUESTION:\n{question}\n\nCONTEXT:\n{ctx}\n\nANSWER:\n"
     )
+    
+def build_explanation_prompt(question: str, passages: List[Dict[str, Any]], fact_sentence: str) -> str:
+    """
+    Build a strict, context-only prompt that produces a short explanation.
+    The first sentence must be the deterministic fact we already extracted.
+    """
+    ctx_limit = 6 if "kyu" in question.lower() else 4
+    ctx = "\n\n".join(p["text"] for p in passages[:ctx_limit])
+    return (
+        "Using ONLY the provided context, write 2–4 short declarative sentences that explain the answer.\n"
+        "Begin with this exact sentence (do not modify it):\n"
+        f"{fact_sentence}\n\n"
+        "Then add 1–3 sentences of rationale drawn from the context. "
+        "No citations, no file names, no brackets.\n\n"
+        f"QUESTION:\n{question}\n\nCONTEXT:\n{ctx}\n\nEXPLANATION:\n"
+    )
+    
 
 def clean_answer(s: str) -> str:
     s = s.strip()
@@ -356,26 +373,37 @@ def polish_answer(raw: str, client: OpenAI, model: str) -> str:
         return raw
 
 # -------------------- RAG pipeline --------------------
-def answer_with_rag(question: str):
+def answer_with_rag(question: str, explain: bool = False):
     # Overfetch more when the query mentions "kyu" (ranks)
     k = TOP_K
     if "kyu" in question.lower():
         k = max(TOP_K * 4, TOP_K + 10)
 
-    # Retrieve
     hits = retrieve(question, k=k)
-
-    # Ensure rank file is present for kyu-style questions (ALWAYS prepend)
     hits = inject_rank_passage_if_needed(question, hits)
-
-    # Build context and compute retrieval quality
     ctx = build_context(hits)
     best = retrieval_quality(hits)
 
-    # Deterministic extractors (Sanshin, Kihon Happo, Schools, Rank-Striking, etc.)
+    # Deterministic extractor path
     fact = try_extract_answer(question, hits)
-    if fact:
+    if fact and not explain:
         return f"🔒 Strict (context-only)\n\n{fact}", hits, "{}"
+
+    if fact and explain:
+        client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
+        user = build_explanation_prompt(question, hits, fact)
+        content, raw = call_model_with_fallback(
+            client=client,
+            model=MODEL,
+            system=STRICT_SYSTEM,
+            user=user,
+            max_tokens=min(MAX_TOKENS, 240),
+            temperature=0.0,
+        )
+        content = clean_answer(content) if content else content
+        if not (content or "").strip().lower().startswith(fact.strip().lower()[:20]):
+            content = f"{fact} " + (content or "")
+        return f"🔒 Strict (context-only, explain)\n\n{content if content else fact}", hits, raw
 
     # Strict vs hybrid selection
     weak_thresh_val = float(os.getenv("WEAK_THRESH", "0.35"))
@@ -383,10 +411,7 @@ def answer_with_rag(question: str):
     system = HYBRID_SYSTEM if use_hybrid else STRICT_SYSTEM
     mode_note = "🧪 Hybrid (context + general knowledge)" if use_hybrid else "🔒 Strict (context-only)"
 
-    # Build user prompt
     user = build_user_prompt(question, hits)
-
-    # Call LLM
     client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
     content, raw = call_model_with_fallback(
         client=client,
@@ -396,13 +421,11 @@ def answer_with_rag(question: str):
         max_tokens=MAX_TOKENS,
         temperature=TEMPERATURE,
     )
-
-    # Clean & polish
     content = clean_answer(content) if content else content
     if "kyu" not in question.lower():
         content = polish_answer(content, client, MODEL)
-
     return f"{mode_note}\n\n{content if content else '❌ Model returned no text.'}", hits, raw
+
 
 # -------------------- UI --------------------
 st.set_page_config(page_title="NTTV Chat", page_icon="💬")
@@ -420,9 +443,11 @@ with st.sidebar:
     weak_thresh_val = float(os.getenv("WEAK_THRESH", "0.35"))
     st.write(f"Weak retrieval threshold: {weak_thresh_val:.2f}")
     st.markdown("---")
+    explain = st.toggle("Explanation mode", value=False, help="Add a brief, context-only rationale after the short fact.")
     show_debug = st.checkbox("Show debugging info (sources & raw model)", value=False)
     st.markdown("---")
     st.write("Tip: update your data in `/data`, run `python ingest.py`, then refresh.")
+
 
 q = st.text_input("Ask a question:", placeholder="e.g., What is the weapon for 7th kyu?")
 if st.button("Ask") or (q and st.session_state.get("auto_run", False)):
@@ -430,7 +455,8 @@ if st.button("Ask") or (q and st.session_state.get("auto_run", False)):
         st.warning("Please enter a question.")
     else:
         with st.spinner("Thinking..."):
-            answer, top_passages, raw_json = answer_with_rag(q)
+            answer, top_passages, raw_json = answer_with_rag(q, explain=explain)
+
 
         st.markdown("### Answer")
         st.write(answer)
