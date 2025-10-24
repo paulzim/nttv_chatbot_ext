@@ -7,6 +7,7 @@ from .rank import (
     try_answer_rank_nage,
     try_answer_rank_jime,
 )
+from .kyusho import try_answer_kyusho
 from .kihon_happo import try_answer_kihon_happo  # if you added it earlier; else you can remove this line
 from .sanshin import try_answer_sanshin     # if you added it earlier; else you can remove this line
 from .schools import try_answer_schools     # if you added it earlier; else you can remove this line

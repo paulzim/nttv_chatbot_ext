@@ -9,7 +9,7 @@ def try_answer_schools(passages: List[Dict[str, Any]]) -> str | None:
     """
     blob = "\n\n".join(p["text"] for p in passages[:8])
     blob_low = blob.lower()
-    if "bujinkan" not in blob_low or "school" not in blob_low:
+    if "bujinkan" not in blob_low:
         return None
 
     target_schools = [

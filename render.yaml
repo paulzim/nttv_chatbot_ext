@@ -1,0 +1,58 @@
+# Render Blueprint: nttv_chatbot_ext
+# Drop this file in the repo root and deploy via "New → Blueprint" on Render.
+
+services:
+  - type: web
+    name: nttv-chatbot
+    runtime: python
+    region: oregon
+    plan: starter        # free | starter | standard | pro — pick what fits
+    autoDeploy: true
+
+    envVars:
+      # === LLM / Provider ===
+      - key: OPENAI_BASE_URL
+        value: https://openrouter.ai/api/v1
+      - key: MODEL_NAME
+        value: openrouter/anthropic/claude-3.5-sonnet
+      - key: OPENAI_API_KEY
+        sync: false         # add the secret in Render dashboard after first deploy
+
+      # === Retrieval / Index ===
+      - key: EMBED_MODEL_NAME
+        value: sentence-transformers/all-MiniLM-L6-v2
+      - key: INDEX_PATH
+        value: /var/data/index/faiss.index
+      - key: META_PATH
+        value: /var/data/index/meta.pkl
+      - key: RANK_FILE
+        value: data/nttv rank requirements.txt
+
+      # === Decoding / Behavior ===
+      - key: TOP_K
+        value: "8"
+      - key: MAX_TOKENS
+        value: "512"
+      - key: TEMPERATURE
+        value: "0.0"
+      - key: WEAK_THRESH
+        value: "0.35"
+      - key: STREAMLIT_BROWSER_GATHER_USAGE_STATS
+        value: "false"
+
+    buildCommand: |
+      pip install -U pip
+      pip install -r requirements.txt
+      # (Re)build FAISS index from /data into the mounted disk
+      python ingest.py
+
+    startCommand: >
+      streamlit run app.py
+      --server.port $PORT
+      --server.address 0.0.0.0
+
+    # Persistent disk so the FAISS index survives restarts/redeploys
+    disk:
+      name: index-disk
+      mountPath: /var/data/index
+      sizeGB: 1

@@ -4,13 +4,25 @@ from typing import List, Dict, Any
 from .common import dedupe_preserve
 
 # ---------- shared helpers ----------
-_ORD_RE = re.compile(r"\b(\d{1,2})(st|nd|rd|th)\s+kyu\b", re.I)
+# Accepts: "8th kyu", "8 kyu", and "kyu 8"
+_ORD_RE = re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+kyu\b", re.I)
+_REV_RE = re.compile(r"\bkyu\s*(\d{1,2})(?:st|nd|rd|th)?\b", re.I)
 
 def _parse_rank_label(q: str) -> str | None:
-    m = _ORD_RE.search(q)
+    ql = q.lower()
+    m = _ORD_RE.search(ql) or _REV_RE.search(ql)
     if not m:
         return None
-    num, suf = m.group(1), m.group(2).lower()
+    num = m.group(1)
+    # canonicalize ordinal suffix
+    suf = "th"
+    if not num.endswith(("11", "12", "13")):
+        if num.endswith("1"):
+            suf = "st"
+        elif num.endswith("2"):
+            suf = "nd"
+        elif num.endswith("3"):
+            suf = "rd"
     return f"{num}{suf} Kyu"
 
 def _split_lines(s: str) -> List[str]:
@@ -20,7 +32,7 @@ def _is_rank_header(line: str) -> bool:
     l = line.strip().lower()
     return bool(
         _ORD_RE.search(l) or
-        re.search(r"\bkyu\s*:\s*\d{1,2}(st|nd|rd|th)\s+kyu\b", l)
+        re.search(r"\bkyu\s*:\s*\d{1,2}(?:st|nd|rd|th)?\s+kyu\b", l)
     )
 
 def _find_rank_block(full_text: str, rank_label: str) -> str | None:
@@ -39,7 +51,7 @@ def _find_rank_block(full_text: str, rank_label: str) -> str | None:
         return None
 
     out = [lines[start_idx]]
-    for ln in lines[start_idx+1:]:
+    for ln in lines[start_idx + 1:]:
         if _is_rank_header(ln):
             break
         out.append(ln)
@@ -62,6 +74,10 @@ def _split_items(s: str) -> List[str]:
         out.append(t)
     return dedupe_preserve(out)
 
+def _pick_rank_passages(passages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    rp = [p for p in passages if "rank requirements" in (p.get("source") or "").lower()]
+    return rp if rp else passages
+
 # ---------- STRIKING (kicks/punches) ----------
 _STRIKE_HEAD_RE = re.compile(r"(?i)^\s*striking(?:\s+\w+){0,3}\s*(?::|[-–—])?\s*(.*)$")
 
@@ -75,19 +91,19 @@ def _extract_striking_line(block_text: str) -> str | None:
     return None
 
 def _is_kick(x: str) -> bool:
-    return "geri" in x.lower()
+    lx = x.lower().strip()
+    WHITELIST = {
+        "zenpo geri", "sokuho geri", "koho geri", "sakui geri", "happo geri"
+    }
+    return ("geri" in lx) or (" kick" in lx) or lx.endswith("kick") or lx in WHITELIST
 
 def _is_punch(x: str) -> bool:
     lx = x.lower()
     return ("tsuki" in lx) or lx.endswith(" ken") or (" ken " in lx) or ("uraken" in lx)
 
-_KICK_INTENT  = re.compile(r"\b(kick|kicks|geri|geris)\b", re.I)
-_PUNCH_INTENT = re.compile(r"\b(punch|punches|tsuki|tsukis)\b|\b(?:^|[\s\-])ken\b", re.I)
-_STRIKE_INTENT= re.compile(r"\b(strike|strikes|striking)\b", re.I)
-
-def _pick_rank_passages(passages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    rp = [p for p in passages if "rank requirements" in (p.get("source") or "").lower()]
-    return rp if rp else passages
+_KICK_INTENT   = re.compile(r"\b(kick|kicks|geri|geris)\b", re.I)
+_PUNCH_INTENT  = re.compile(r"\b(punch|punches|tsuki|tsukis)\b|\b(?:^|[\s\-])ken\b", re.I)
+_STRIKE_INTENT = re.compile(r"\b(strike|strikes|striking)\b", re.I)
 
 def try_answer_rank_striking(question: str, passages: List[Dict[str, Any]]) -> str | None:
     ql = question.lower()
@@ -128,11 +144,9 @@ def try_answer_rank_striking(question: str, passages: List[Dict[str, Any]]) -> s
 
 # ---------- NAGE WAZA (throws) ----------
 # Accept "Nage waza:", "Nage-waza:", "Throws:", etc.
-_NAGE_HEAD_RE = re.compile(
-    r"(?i)^\s*(?:nage\s*-?\s*waza|throws)\s*(?::|[-–—])?\s*(.*)$"
-)
-# Query intents that imply throws
-_THROW_INTENT = re.compile(r"\b(throw|throws|toss|nage)\b", re.I)
+_NAGE_HEAD_RE = re.compile(r"(?i)^\s*(?:nage\s*-?\s*waza|throws)\s*(?::|[-–—])?\s*(.*)$")
+# Query intents that imply throws (synonyms included)
+_THROW_INTENT = re.compile(r"\b(throw|throws|toss|nage|projection|take\s*down|takedown)\b", re.I)
 
 def _extract_nage_line(block_text: str) -> str | None:
     for ln in _split_lines(block_text):
@@ -172,11 +186,9 @@ def try_answer_rank_nage(question: str, passages: List[Dict[str, Any]]) -> str |
     return None
 
 # ---------- JIME WAZA (chokes) ----------
-_JIME_HEAD_RE = re.compile(
-    r"(?i)^\s*(?:jime\s*-?\s*waza|chokes?)\s*(?::|[-–—])?\s*(.*)$"
-)
+_JIME_HEAD_RE = re.compile(r"(?i)^\s*(?:jime\s*-?\s*waza|chokes?)\s*(?::|[-–—])?\s*(.*)$")
 # Query intents that imply chokes
-_CHOKE_INTENT = re.compile(r"\b(choke|chokes|strangle|jime)\b", re.I)
+_CHOKE_INTENT = re.compile(r"\b(choke|chokes|strangle|jime|strangulation)\b", re.I)
 
 def _extract_jime_line(block_text: str) -> str | None:
     for ln in _split_lines(block_text):
@@ -211,5 +223,50 @@ def try_answer_rank_jime(question: str, passages: List[Dict[str, Any]]) -> str |
 
     if items:
         return f"{rank_label} chokes (Jime waza): " + ", ".join(items) + "."
+
+    return None
+
+# ---------- WEAPONS (Buki) ----------
+# Accept "Weapons:", "Weapon:", "Buki:", etc.
+_WEAPON_HEAD_RE = re.compile(r"(?i)^\s*(?:weapons?|buki)\s*(?::|[-–—])?\s*(.*)$")
+# Trigger on generic "weapons/buki" or common weapon names to be user-friendly
+_WEAPON_INTENT = re.compile(
+    r"\b(weapon|weapons|buki|sword|katana|tanto|bokken|bo|hanbo|staff|stick|yari|naginata|shuriken|kusari(?:fundo)?|rope|shoge|kyoketsu(?:\s*shoge)?)\b",
+    re.I
+)
+
+def _extract_weapon_line(block_text: str) -> str | None:
+    for ln in _split_lines(block_text):
+        m = _WEAPON_HEAD_RE.match(ln)
+        if m:
+            rest = m.group(1).strip()
+            if rest:
+                return rest
+    return None
+
+def try_answer_rank_weapons(question: str, passages: List[Dict[str, Any]]) -> str | None:
+    ql = question.lower()
+    if not _WEAPON_INTENT.search(ql):
+        return None
+
+    rank_label = _parse_rank_label(ql)
+    if not rank_label:
+        return None
+
+    rank_passages = _pick_rank_passages(passages)
+    full_text = "\n\n".join(p["text"] for p in rank_passages)
+    block = _find_rank_block(full_text, rank_label)
+    if not block:
+        return None
+
+    # Prefer a dedicated "Weapons/Buki" line; if absent, scan whole block
+    wl = _extract_weapon_line(block)
+    items = _split_items(wl) if wl else _split_items(block)
+
+    if wl is not None and not items:
+        return f"{rank_label} weapons: (none listed)."
+
+    if items:
+        return f"{rank_label} weapons: " + ", ".join(items) + "."
 
     return None

@@ -1,0 +1,11 @@
+QUESTION: What are the kicks I need to know for 8th kyu?
+EXPECT_ANY: mae geri|zenpo geri|front kick
+EXPECT_NOT: hoken juroppo ken
+
+---
+QUESTION: What are the throws for 4th kyu?
+EXPECT_ANY: osoto|seoi|sutemi
+
+---
+QUESTION: What are the chokes for 3rd kyu?
+EXPECT_ANY: jime|hadaka|kataha
