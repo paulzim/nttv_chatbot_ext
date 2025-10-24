@@ -544,39 +544,76 @@ def try_build_sanshin_explanation(question: str, passages: List[Dict[str, Any]])
 def try_build_schools_explanation(question: str, passages: List[Dict[str, Any]]) -> str | None:
     """
     Deterministic one-liner that lists Bujinkan schools when asked about 'schools' or 'ryu'.
+    Handles both comma/semicolon lists AND one-per-line lists after a header line.
     """
     ql = question.lower()
-    if not ("school" in ql or "schools" in ql or "ryu" in ql or "ryū" in ql):
+    if not ("school" in ql or "schools" in ql or "ryu" in ql or "ryū" in ql or "bujinkan" in ql):
         return None
 
-    names = []
-    for p in passages[:12]:
-        t = (p.get("text", "") or "").strip()
-        if not t or "bujinkan" not in t.lower():
-            continue
-        for line in t.splitlines():
-            L = line.strip()
-            if len(L) < 20 or len(L) > 400:
-                continue
-            # harvest comma/semicolon lists that look like multiple proper nouns
-            if ("," in L or ";" in L) and sum(ch in L for ch in ",;") >= 4:
-                parts = [x.strip(" -•\t") for x in re.split(r"[;,]", L) if x.strip()]
-                # keep name-like tokens (2–60 chars, avoid sentences)
-                for p2 in parts:
-                    if 2 <= len(p2) <= 60 and not p2.endswith((".", ":", ";")):
-                        names.append(p2)
+    # Name-ish line detector: allows diacritics and hyphens, must end with 'ryu' or 'ryū'
+    NAME_LINE = re.compile(r"^\s*[•\-\u2022]?\s*([A-Za-z0-9 .’'ʻ`\-ōūāīŌŪĀĪÉé]+(?:-?ryu|ryū))\s*$", re.IGNORECASE)
+    SEP = re.compile(r"[;,]")
 
-    # dedupe and cap
-    seen, out = set(), []
-    for x in names:
-        k = x.strip().lower()
-        if k in seen:
+    def _norm(s: str) -> str:
+        return re.sub(r"\s+", " ", s.strip())
+
+    names: List[str] = []
+
+    for p in passages[:15]:
+        t = (p.get("text", "") or "").strip()
+        if not t:
             continue
-        seen.add(k); out.append(x.strip())
+        lines = t.splitlines()
+
+        # 1) If we see a header like "The schools of the Bujinkan", harvest following name-like lines.
+        for i, ln in enumerate(lines):
+            lnl = ln.lower().strip()
+            if ("schools of the bujinkan" in lnl) or (lnl.startswith("the schools of") and "bujinkan" in lnl):
+                j = i + 1
+                while j < len(lines):
+                    cand = lines[j].strip()
+                    if not cand:
+                        break
+                    m = NAME_LINE.match(cand)
+                    if m:
+                        names.append(_norm(m.group(1)))
+                        j += 1
+                        continue
+                    # If we run into a paragraph/sentence, stop the header block scan.
+                    if len(cand) > 120 or cand.endswith((".", ":", ";")):
+                        break
+                    j += 1
+                # don't break; there could be more headers in other chunks
+
+        # 2) Also harvest inline lists in any line (comma/semicolon separated)
+        for ln in lines:
+            # long line that looks like a list of proper nouns
+            if (("," in ln) or (";" in ln)) and len(ln) <= 400:
+                parts = [x.strip(" -•\t") for x in SEP.split(ln) if x.strip()]
+                for p2 in parts:
+                    if NAME_LINE.match(p2):
+                        names.append(_norm(p2))
+
+        # 3) Finally, collect standalone name-like lines anywhere
+        for ln in lines:
+            m = NAME_LINE.match(ln)
+            if m:
+                names.append(_norm(m.group(1)))
+
+    # De-dupe, preserve order, and cap to a tidy length
+    seen = set()
+    out: List[str] = []
+    for n in names:
+        key = n.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(n)
 
     if len(out) >= 5:
         return f"The Bujinkan encompasses classical lineages including: {', '.join(out[:9])}."
     return None
+
 
 def try_build_strike_explanation(question: str, passages: list[dict]) -> str | None:
     """
