@@ -1,58 +1,57 @@
 # extractors/__init__.py
-import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
-from .kihon_happo import try_answer_kihon_happo
-from .sanshin import try_answer_sanshin
-from .schools import try_answer_schools
-from .rank import try_answer_rank_striking  # kicks/punches/striking by rank
-
-# Very tolerant detectors
-_RANK_ANY   = re.compile(r"\b\d{1,2}(?:st|nd|rd|th)\s+kyu\b", re.I)
-_STRIKE_ANY = re.compile(
-    r"\b("
-    r"kicks?|geri|geris|"
-    r"punch(?:es)?|tsuki|tsukis|uraken|"
-    r"strikes?|striking|"
-    r"(?:^|[\s\-])ken\b"   # matches “-ken” terms as a word
-    r")\b",
-    re.I,
+# Specific extractors
+from .rank import (
+    try_answer_rank_striking,
+    try_answer_rank_nage,
+    try_answer_rank_jime,
 )
+from .kihon_happo import try_answer_kihon_happo  # if you added it earlier; else you can remove this line
+from .sanshin import try_answer_sanshin     # if you added it earlier; else you can remove this line
+from .schools import try_answer_schools     # if you added it earlier; else you can remove this line
 
-def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> str | None:
-    """Route core questions to deterministic extractors; return None if no match."""
-    ql = question.lower()
+def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
+    """
+    Deterministic, context-only answers for high-signal intents.
+    Returns a single short string or None to fall back to the LLM.
+    Order matters: most specific first.
+    """
+    # --- Rank-specific: Striking (kicks/punches)
+    ans = try_answer_rank_striking(question, passages)
+    if ans:
+        return ans
 
-    # ✅ Always try rank striking first if the question mentions a rank and any striking term
-    if _RANK_ANY.search(ql) and _STRIKE_ANY.search(ql):
-        ans = try_answer_rank_striking(question, passages)
+    # --- Rank-specific: Throws (Nage waza)
+    ans = try_answer_rank_nage(question, passages)
+    if ans:
+        return ans
+
+    # --- Rank-specific: Chokes (Jime waza)
+    ans = try_answer_rank_jime(question, passages)
+    if ans:
+        return ans
+
+    # --- Concepts (optional if you added them)
+    try:
+        ans = try_answer_kihon_happo(question, passages)
         if ans:
             return ans
+    except Exception:
+        pass
 
-    # Kihon Happo
-    if re.search(r"\bkihon\s+happo\b", ql):
-        ans = try_answer_kihon_happo(passages)
+    try:
+        ans = try_answer_sanshin(question, passages)
         if ans:
             return ans
+    except Exception:
+        pass
 
-    # Sanshin (various spellings)
-    if re.search(r"\bsanshin(?:\s+no\s+kata)?\b", ql) or re.search(r"\bsan\s+shin\b", ql):
-        ans = try_answer_sanshin(passages)
+    try:
+        ans = try_answer_schools(question, passages)
         if ans:
             return ans
-
-    # Schools of the Bujinkan
-    if "bujinkan" in ql and re.search(r"\bschool", ql):
-        ans = try_answer_schools(passages)
-        if ans:
-            return ans
-
-    # 👉 Safety net: if “kyu” appears at all, still try the rank extractor (helps looser queries)
-    if "kyu" in ql:
-        ans = try_answer_rank_striking(question, passages)
-        if ans:
-            return ans
+    except Exception:
+        pass
 
     return None
-
-__all__ = ["try_extract_answer"]

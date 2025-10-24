@@ -3,7 +3,7 @@ import re
 from typing import List, Dict, Any
 from .common import dedupe_preserve
 
-# ---------- helpers ----------
+# ---------- shared helpers ----------
 _ORD_RE = re.compile(r"\b(\d{1,2})(st|nd|rd|th)\s+kyu\b", re.I)
 
 def _parse_rank_label(q: str) -> str | None:
@@ -30,8 +30,6 @@ def _find_rank_block(full_text: str, rank_label: str) -> str | None:
     """
     lines = _split_lines(full_text)
     start_idx = None
-
-    # Accept either "... 8th Kyu ..." or "Kyu: 8th Kyu"
     pat = re.compile(rf"(?i)\b{re.escape(rank_label)}\b|kyu\s*:\s*{re.escape(rank_label)}\b")
     for i, ln in enumerate(lines):
         if pat.search(ln):
@@ -46,19 +44,6 @@ def _find_rank_block(full_text: str, rank_label: str) -> str | None:
             break
         out.append(ln)
     return "\n".join(out).strip()
-
-# Accept "Striking", "Striking –", "Striking —", "Striking -", "Striking Techniques", etc.
-_STRIKE_HEAD_RE = re.compile(r"(?i)^\s*striking(?:\s+\w+){0,3}\s*(?::|[-–—])?\s*(.*)$")
-
-def _extract_striking_line(block_text: str) -> str | None:
-    for ln in _split_lines(block_text):
-        m = _STRIKE_HEAD_RE.match(ln)
-        if m:
-            # Content after the header token(s)
-            rest = m.group(1).strip()
-            if rest:
-                return rest
-    return None
 
 def _split_items(s: str) -> List[str]:
     """Split tolerant to commas/semicolons/slashes/newlines/bullets/pipes/“and”."""
@@ -77,6 +62,18 @@ def _split_items(s: str) -> List[str]:
         out.append(t)
     return dedupe_preserve(out)
 
+# ---------- STRIKING (kicks/punches) ----------
+_STRIKE_HEAD_RE = re.compile(r"(?i)^\s*striking(?:\s+\w+){0,3}\s*(?::|[-–—])?\s*(.*)$")
+
+def _extract_striking_line(block_text: str) -> str | None:
+    for ln in _split_lines(block_text):
+        m = _STRIKE_HEAD_RE.match(ln)
+        if m:
+            rest = m.group(1).strip()
+            if rest:
+                return rest
+    return None
+
 def _is_kick(x: str) -> bool:
     return "geri" in x.lower()
 
@@ -84,7 +81,6 @@ def _is_punch(x: str) -> bool:
     lx = x.lower()
     return ("tsuki" in lx) or lx.endswith(" ken") or (" ken " in lx) or ("uraken" in lx)
 
-# ---------- public API ----------
 _KICK_INTENT  = re.compile(r"\b(kick|kicks|geri|geris)\b", re.I)
 _PUNCH_INTENT = re.compile(r"\b(punch|punches|tsuki|tsukis)\b|\b(?:^|[\s\-])ken\b", re.I)
 _STRIKE_INTENT= re.compile(r"\b(strike|strikes|striking)\b", re.I)
@@ -106,12 +102,10 @@ def try_answer_rank_striking(question: str, passages: List[Dict[str, Any]]) -> s
     rank_passages = _pick_rank_passages(passages)
     full_text = "\n\n".join(p["text"] for p in rank_passages)
 
-    # 1) Build the rank block by lines
     block = _find_rank_block(full_text, rank_label)
     if not block:
         return None
 
-    # 2) Prefer a dedicated Striking line; if absent, scan the whole block
     striking = _extract_striking_line(block)
     tokens = _split_items(striking) if striking else _split_items(block)
 
@@ -126,10 +120,96 @@ def try_answer_rank_striking(question: str, passages: List[Dict[str, Any]]) -> s
 
     if parts:
         return " ".join(parts)
-
-    # Graceful fallback
     if wants_kicks and not kicks:
         return f"{rank_label} kicks: (none listed)."
     if wants_punches and not punches:
         return f"{rank_label} punches: (none listed)."
+    return None
+
+# ---------- NAGE WAZA (throws) ----------
+# Accept "Nage waza:", "Nage-waza:", "Throws:", etc.
+_NAGE_HEAD_RE = re.compile(
+    r"(?i)^\s*(?:nage\s*-?\s*waza|throws)\s*(?::|[-–—])?\s*(.*)$"
+)
+# Query intents that imply throws
+_THROW_INTENT = re.compile(r"\b(throw|throws|toss|nage)\b", re.I)
+
+def _extract_nage_line(block_text: str) -> str | None:
+    for ln in _split_lines(block_text):
+        m = _NAGE_HEAD_RE.match(ln)
+        if m:
+            rest = m.group(1).strip()
+            if rest:
+                return rest
+    return None
+
+def try_answer_rank_nage(question: str, passages: List[Dict[str, Any]]) -> str | None:
+    ql = question.lower()
+    if not _THROW_INTENT.search(ql) and "nage" not in ql:
+        return None
+
+    rank_label = _parse_rank_label(ql)
+    if not rank_label:
+        return None
+
+    rank_passages = _pick_rank_passages(passages)
+    full_text = "\n\n".join(p["text"] for p in rank_passages)
+    block = _find_rank_block(full_text, rank_label)
+    if not block:
+        return None
+
+    # Prefer a dedicated "Nage waza"/"Throws" line; if absent, scan whole block
+    nage = _extract_nage_line(block)
+    items = _split_items(nage) if nage else _split_items(block)
+
+    # Heuristic: if a "Nage waza" line existed but had no items, say (none listed)
+    if nage is not None and not items:
+        return f"{rank_label} throws (Nage waza): (none listed)."
+
+    if items:
+        return f"{rank_label} throws (Nage waza): " + ", ".join(items) + "."
+
+    return None
+
+# ---------- JIME WAZA (chokes) ----------
+_JIME_HEAD_RE = re.compile(
+    r"(?i)^\s*(?:jime\s*-?\s*waza|chokes?)\s*(?::|[-–—])?\s*(.*)$"
+)
+# Query intents that imply chokes
+_CHOKE_INTENT = re.compile(r"\b(choke|chokes|strangle|jime)\b", re.I)
+
+def _extract_jime_line(block_text: str) -> str | None:
+    for ln in _split_lines(block_text):
+        m = _JIME_HEAD_RE.match(ln)
+        if m:
+            rest = m.group(1).strip()
+            if rest:
+                return rest
+    return None
+
+def try_answer_rank_jime(question: str, passages: List[Dict[str, Any]]) -> str | None:
+    ql = question.lower()
+    if not _CHOKE_INTENT.search(ql) and "jime" not in ql:
+        return None
+
+    rank_label = _parse_rank_label(ql)
+    if not rank_label:
+        return None
+
+    rank_passages = _pick_rank_passages(passages)
+    full_text = "\n\n".join(p["text"] for p in rank_passages)
+    block = _find_rank_block(full_text, rank_label)
+    if not block:
+        return None
+
+    # Prefer a dedicated "Jime waza/Chokes" line; if absent, scan whole block
+    jime = _extract_jime_line(block)
+    items = _split_items(jime) if jime else _split_items(block)
+
+    if jime is not None and not items:
+        return f"{rank_label} chokes (Jime waza): (none listed)."
+
+    if items:
+        return f"{rank_label} chokes (Jime waza): " + ", ".join(items) + "."
+
     return None
