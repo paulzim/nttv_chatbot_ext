@@ -14,6 +14,8 @@ from extractors import try_extract_answer
 from extractors.leadership import try_extract_answer as try_leadership
 from extractors.schools import try_answer_school_profile  
 from extractors.weapons import try_answer_weapon_rank  
+from extractors.rank import try_answer_rank_requirements  
+
 
 
 # CPU embeddings
@@ -437,11 +439,20 @@ def answer_with_rag(question: str):
     if wr:
         return f"🔒 Strict (context-only)\n\n{wr}", hits, '{"det_path":"weapons/rank"}'
 
+    # Rank requirements (ENTIRE BLOCK) — short-circuit, no LLM fluff
+    rr = None
+    try:
+        rr = try_answer_rank_requirements(question, hits)
+    except Exception:
+        rr = None
+    if rr:
+        return f"🔒 Strict (context-only, explain)\n\n{rr}", hits, '{"det_path":"rank/requirements"}'
 
-    # Deterministic rank/kyusho/etc.
+    # Deterministic rank/kyusho/etc. (compute now; we’ll use it after school profile)
     fact = try_extract_answer(question, hits)
 
-    # NEW: deterministic school profile
+    
+    # Deterministic school profile
     school_fact = try_answer_school_profile(question, hits)
     if school_fact:
         sec = _school_section_only(question, hits)
@@ -474,6 +485,7 @@ def answer_with_rag(question: str):
         )
         content = clean_answer(content) if content else fact
         return f"🔒 Strict (context-only, explain)\n\n{content}", explain_hits, raw
+    
 
     # Last resort: general explanation from context
     explain_hits = hits
