@@ -1,4 +1,4 @@
-# app.py — NTTV Chat (Always-Explain, Context-Only)
+# app.py — NTTV Chat (Always-Explain, Context-Only) with Leadership + Weapons boosts
 import os, pickle, json, re
 from pathlib import Path
 from typing import List, Dict, Any
@@ -151,6 +151,17 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
         has_soke = ("[sokeship]" in t_low) or (" soke" in t_low) or (" sōke" in t_low)
         if ask_soke and has_soke:
             qt_boost += 0.40
+
+        # ✅ Weapons retrieval boost (mild)
+        weapon_terms = [
+            "hanbo", "hanbō", "rokushakubo", "rokushaku", "katana", "tanto", "shoto",
+            "kusari fundo", "naginata", "kyoketsu shoge", "shuko", "jutte", "tessen",
+            "kunai", "shuriken", "senban", "shaken"
+        ]
+        ask_weapon = any(w in q_low for w in weapon_terms) or ("weapon" in q_low) or ("weapons" in q_low)
+        has_weapon = any(w in t_low for w in weapon_terms) or ("[weapon]" in t_low) or ("weapons reference" in t_low)
+        if ask_weapon and has_weapon:
+            qt_boost += 0.30
 
         offtopic_penalty = 0.0
         if "kihon happo" in q_low and "kyusho" in t_low:
@@ -391,6 +402,10 @@ def enrich_context_for_explanation(question: str, hits: list[dict], k_extra: int
         alt_q = "Sanshin no Kata five forms list definition"
     elif "school" in ql or "schools" in ql or "ryu" in ql or "ryū" in ql:
         alt_q = "Bujinkan schools list ryu names summary"
+    elif any(w in ql for w in ["hanbo", "hanbō", "rokushakubo", "rokushaku", "shuriken", "senban", "shaken",
+                                "katana", "tanto", "shoto", "kusari fundo", "naginata", "kyoketsu shoge",
+                                "shuko", "jutte", "tessen", "kunai"]):
+        alt_q = "NTTV Weapons Reference WEAPON blocks and weapon summaries"
 
     if not alt_q:
         return hits
@@ -766,7 +781,7 @@ with st.sidebar:
     st.markdown("---")
     st.write("Tip: update your data in `/data`, run `python ingest.py`, then refresh.")
 
-q = st.text_input("Ask a question:", placeholder="e.g., Tell me about Gyokko-ryu")
+q = st.text_input("Ask a question:", placeholder="e.g., Tell me about Gyokko-ryu or What is a Hanbo?")
 if st.button("Ask") or (q and st.session_state.get("auto_run", False)):
     if not q.strip():
         st.warning("Please enter a question.")
