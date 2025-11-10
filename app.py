@@ -61,7 +61,9 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
     D, I = index.search(v, k * 2)  # overfetch then rerank
     cand = []
 
+    # ---- normalize a few common typos early (so boosts match)
     q_low = q.lower()
+    q_low = q_low.replace("gyokku ryu", "gyokko ryu").replace("gyokku-ryu", "gyokko-ryu")
 
     for idx, score in zip(I[0], D[0]):
         c = CHUNKS[idx]
@@ -144,13 +146,16 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
         if any(a in q_low for a in school_aliases) and any(a in t_low for a in school_aliases):
             qt_boost += 0.45
 
-        # ✅ Leadership / Soke retrieval boost
+        # ---- Leadership / Soke retrieval boost (stronger, filename-aware)
         ask_soke = any(t in q_low for t in [
             "soke", "sōke", "grandmaster", "headmaster", "current head", "current grandmaster"
         ])
         has_soke = ("[sokeship]" in t_low) or (" soke" in t_low) or (" sōke" in t_low)
-        if ask_soke and has_soke:
-            qt_boost += 0.40
+        fname = os.path.basename(meta.get("source", "")).lower()
+        if ask_soke and (has_soke or "leadership" in fname):
+            qt_boost += 0.60  # stronger push
+            if "leadership" in fname:
+                qt_boost += 0.20  # extra bias to that file
 
         # ✅ Weapons retrieval boost (mild)
         weapon_terms = [
@@ -406,6 +411,8 @@ def enrich_context_for_explanation(question: str, hits: list[dict], k_extra: int
                                 "katana", "tanto", "shoto", "kusari fundo", "naginata", "kyoketsu shoge",
                                 "shuko", "jutte", "tessen", "kunai"]):
         alt_q = "NTTV Weapons Reference WEAPON blocks and weapon summaries"
+    elif any(t in ql for t in ["soke", "sōke", "grandmaster", "headmaster"]):
+        alt_q = "Bujinkan Leadership Sokeship current soke names"
 
     if not alt_q:
         return hits
@@ -728,6 +735,8 @@ def answer_with_rag(question: str):
     # Enrich context so the model (or deterministic explainer) has material
     explain_hits = enrich_context_for_explanation(question, hits, k_extra=max(TOP_K * 2, 12))
 
+    asking_soke = any(t in question.lower() for t in ["soke", "sōke", "grandmaster", "headmaster", "current head", "current grandmaster"])
+
     # 🔒 Deterministic explanation attempts (no model)
     if fact:
         det_expl = try_build_kihon_explanation(question, explain_hits, fact)
@@ -738,9 +747,10 @@ def answer_with_rag(question: str):
     if det_expl:
         return f"🔒 Strict (context-only, explain)\n\n{det_expl}", explain_hits, "{}"
 
-    det_expl = try_build_schools_explanation(question, explain_hits)
-    if det_expl:
-        return f"🔒 Strict (context-only, explain)\n\n{det_expl}", explain_hits, "{}"
+    if not asking_soke:
+        det_expl = try_build_schools_explanation(question, explain_hits)
+        if det_expl:
+            return f"🔒 Strict (context-only, explain)\n\n{det_expl}", explain_hits, "{}"
 
     det_expl = try_build_sanshin_explanation(question, explain_hits)
     if det_expl:
@@ -781,7 +791,7 @@ with st.sidebar:
     st.markdown("---")
     st.write("Tip: update your data in `/data`, run `python ingest.py`, then refresh.")
 
-q = st.text_input("Ask a question:", placeholder="e.g., Tell me about Gyokko-ryu or What is a Hanbo?")
+q = st.text_input("Ask a question:", placeholder="e.g., Who is the sōke of Koto-ryu? or Tell me about Gyokko-ryu")
 if st.button("Ask") or (q and st.session_state.get("auto_run", False)):
     if not q.strip():
         st.warning("Please enter a question.")
