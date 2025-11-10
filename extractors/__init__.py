@@ -1,57 +1,60 @@
 # extractors/__init__.py
 from typing import List, Dict, Any, Optional
 
-# ----- Rank-specific extractors (most precise; run first) -----
+# --- Leadership (Sōke/Grandmaster) — keep this near the top in the dispatcher order
+from .leadership import try_extract_answer as try_leadership
+
+# --- Rank-specific extractors (precise)
 from .rank import (
     try_answer_rank_striking,
     try_answer_rank_nage,
     try_answer_rank_jime,
-    # keep if you've implemented weapons in rank.py; otherwise remove this import + call
-    try_answer_rank_weapons,  # optional
 )
+# Optional: only if you've actually implemented this in rank.py; otherwise set to None
+try:
+    from .rank import try_answer_rank_weapons  # type: ignore
+except Exception:
+    try_answer_rank_weapons = None  # type: ignore
 
-# ----- Concept extractors (deterministic, context-only) -----
+# --- Weapons (deterministic, from NTTV Weapons Reference + glossary)
+try:
+    from .weapons import try_answer_weapons
+except Exception:
+    def try_answer_weapons(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
+        return None
+
+# --- Concepts
 from .kyusho import try_answer_kyusho
 from .kihon_happo import try_answer_kihon_happo
 from .sanshin import try_answer_sanshin
 from .schools import try_answer_schools
 
-# NEW: leadership (current sōke/grandmaster)
-from .leadership import try_extract_answer as try_leadership
-
 
 def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
     """
     Deterministic, context-only answers for high-signal intents.
-    Return a single short string or None to fall back to the LLM.
-    Order matters: most specific (rank) -> leadership -> core concepts.
+    Return a short string or None to let the LLM/explainers handle it.
+    Order matters: rank -> leadership -> weapons -> core concepts.
     """
 
-    ql = question.lower()
+    # ----- Rank-specific -----
+    for fn in (try_answer_rank_striking, try_answer_rank_nage, try_answer_rank_jime):
+        try:
+            ans = fn(question, passages)
+            if ans:
+                return ans
+        except Exception:
+            pass
 
-    # ---------- Rank-specific ----------
-    ans = try_answer_rank_striking(question, passages)
-    if ans:
-        return ans
+    if try_answer_rank_weapons:
+        try:
+            ans = try_answer_rank_weapons(question, passages)  # type: ignore
+            if ans:
+                return ans
+        except Exception:
+            pass
 
-    ans = try_answer_rank_nage(question, passages)
-    if ans:
-        return ans
-
-    ans = try_answer_rank_jime(question, passages)
-    if ans:
-        return ans
-
-    # Optional: rank weapons
-    try:
-        ans = try_answer_rank_weapons(question, passages)  # remove if not using
-        if ans:
-            return ans
-    except Exception:
-        pass
-
-    # ---------- Leadership (Sōke / Grandmaster) ----------
-    # Run BEFORE generic school/sanshin/kyusho so we short-circuit with a person’s name.
+    # ----- Leadership (Sōke) -----
     try:
         ans = try_leadership(question, passages)
         if ans:
@@ -59,34 +62,21 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optiona
     except Exception:
         pass
 
-    # ---------- Concepts ----------
-    # Kyusho first so it doesn’t get overshadowed by other concept extractors
+    # ----- Weapons (deterministic) -----
     try:
-        ans = try_answer_kyusho(question, passages)
+        ans = try_answer_weapons(question, passages)
         if ans:
             return ans
     except Exception:
         pass
 
-    try:
-        ans = try_answer_kihon_happo(question, passages)
-        if ans:
-            return ans
-    except Exception:
-        pass
-
-    try:
-        ans = try_answer_sansin(question, passages)  # NOTE: keep exact name if your file uses 'sanshin'
-        if ans:
-            return ans
-    except Exception:
-        pass
-
-    try:
-        ans = try_answer_schools(question, passages)
-        if ans:
-            return ans
-    except Exception:
-        pass
+    # ----- Concepts -----
+    for fn in (try_answer_kyusho, try_answer_kihon_happo, try_answer_sanshin, try_answer_schools):
+        try:
+            ans = fn(question, passages)
+            if ans:
+                return ans
+        except Exception:
+            pass
 
     return None
