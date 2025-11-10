@@ -300,6 +300,43 @@ def inject_rank_passage_if_needed(question: str, hits: List[Dict[str, Any]]) -> 
     }
     return [synth] + hits
 
+# -------------------- Leadership-file injectors --------------------
+
+def _gather_full_text_for_source(name_contains: str) -> tuple[str | None, str | None]:
+    """Concatenate all CHUNKS from sources whose basename contains `name_contains`."""
+    want = name_contains.lower()
+    matched = [c for c in CHUNKS if want in os.path.basename((c.get("meta", {}) or {}).get("source", "")).lower()]
+    if not matched:
+        return None, None
+    parts = [c.get("text") or "" for c in matched]
+    full = "\n\n".join(parts).strip() if parts else None
+    any_path = matched[0].get("meta", {}).get("source")
+    return (full if full else None), any_path
+
+def inject_leadership_passage_if_needed(question: str, hits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    For any sōke/grandmaster question, prepend a synthetic passage that contains the full
+    leadership file so the extractor sees everything in one block.
+    """
+    ql = question.lower()
+    if not any(t in ql for t in ["soke", "sōke", "grandmaster", "headmaster", "current head", "current grandmaster"]):
+        return hits
+
+    txt, path = _gather_full_text_for_source("leadership")
+    if not txt:
+        return hits
+
+    synth = {
+        "text": txt,
+        "meta": {"priority": 1, "source": path or "Bujinkan Leadership (synthetic)"},
+        "source": path or "Bujinkan Leadership (synthetic)",
+        "page": None,
+        "score": 1.0,
+        "rerank_score": 998.0,  # very high, but keep below rank injector if both exist
+    }
+    return [synth] + hits
+
+
 # -------------------- Prompting + LLM call --------------------
 STRICT_SYSTEM = (
     "You are the NTTV assistant. Answer ONLY from the provided context.\n"
@@ -726,6 +763,7 @@ def answer_with_rag(question: str):
 
     hits = retrieve(question, k=k)
     hits = inject_rank_passage_if_needed(question, hits)
+    hits = inject_leadership_passage_if_needed(question, hits)  
 
     # Deterministic extractor fact (short) if available
     fact = try_extract_answer(question, hits)
