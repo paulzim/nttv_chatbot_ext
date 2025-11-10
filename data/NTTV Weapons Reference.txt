@@ -1,0 +1,89 @@
+[WEAPON] Hanbo
+ALIASES: hanbo, hanbō, short staff, three-foot staff, 3-foot staff
+TYPE: Short staff (approx. 90 cm or 3 feet)
+KAMAE: Munen Muso, Kata Yaburi, Ontonashi
+CORE ACTIONS: shomen uchi, yokomen uchi, age uchi, do-kote strikes, tsuki thrust, ashi-barai sweep
+RANKS: Introduced at 8th Kyu
+NOTES: Often used to enter, disrupt balance, and strike at skeletal targets; integrates smoothly with taijutsu footwork.
+
+[WEAPON] Rokushakubo
+ALIASES: rokushakubo, rokushaku bo, bo, long staff, rokushaku-bō
+TYPE: Long staff (approx. 180 cm or 6 feet)
+KAMAE: hira no kamae, chudan, jodan, gedan, seigan, heito, ihen
+CORE ACTIONS: long-range shomen/yokomen/age/do strikes, tsuki thrusts, sweeping actions, bo-furi spinning drills
+RANKS: Introduced at 6th Kyu
+NOTES: Emphasizes distance, leverage, and centerline control; integrates ukemi and spinning transitions.
+
+[WEAPON] Shuriken
+ALIASES: shuriken, bo shuriken, bō shuriken, senban, shaken, throwing spike, throwing star
+TYPE: Throwing blades (spikes or flat blades)
+MODES: daken-jutsu (throwing), shoken-jutsu (in-hand striking)
+THROWS: jikidaho (direct), hantendaho (reverse), takai-tendaho (fast spin)
+RANGE: Common 3-ken range (~5.4 m); extended range develops with practice
+SAFETY/DRILL: anchor point alignment, wrist snap, concealment, controlled retrieval path
+RANKS: Introduced at 3rd Kyu
+NOTES: Used for distraction, pain compliance, and precision targeting; multiple shapes exist across Bujinkan schools.
+
+[WEAPON] Katana
+ALIASES: katana, sword, daito
+TYPE: Long sword
+KAMAE: daijodan, chudan, gedan, seigan, jodan
+CORE ACTIONS: kirioroshi (vertical cut), yokogiri (horizontal cut), thrusts, deflections, kamae transitions
+RANKS: Introduced at 7th Kyu
+NOTES: Movement emphasizes distance, timing, and angling; integrates naturally with taijutsu footwork.
+
+[WEAPON] Tanto
+ALIASES: tanto, dagger, knife
+TYPE: Short blade (close-range)
+CORE ACTIONS: tsuki thrust, yokomen slashes, grip transitions, disarms
+RANKS: Introduced at 5th Kyu
+NOTES: Often taught as both offensive and defensive material; integrates with taihen (body evasion).
+
+[WEAPON] Shoto
+ALIASES: shoto, short sword, shōtō
+TYPE: Short sword
+CORE ACTIONS: close-range cuts, thrusts, traps, paired weapon interactions
+RANKS: Introduced at 5th Kyu
+NOTES: Used for confined-space movement and rapid transitions.
+
+[WEAPON] Kusari Fundo
+ALIASES: kusari fundo, manriki-gusari, weighted chain
+TYPE: Chain weapon with weighted ends
+CORE ACTIONS: wrapping, entangling, joint targeting, percussive strikes, weapon control
+RANKS: Introduced at 4th Kyu
+NOTES: Requires strong control and awareness; blends striking and grappling concepts.
+
+[WEAPON] Kyoketsu Shoge
+ALIASES: kyoketsu shoge, kyoketsu-shoge, kyoketsu shōge
+TYPE: Blade + rope + ring combination weapon
+CORE ACTIONS: entanglement, snagging, extended-range stabbing, sweeping, control of limbs and weapons
+RANKS: Introduced at 1st Kyu
+NOTES: Emphasizes distance manipulation, angling, and deceptive trajectories.
+
+[WEAPON] Tessen
+ALIASES: tessen, iron fan
+TYPE: Rigid fan weapon
+CORE ACTIONS: striking, trapping, pressure targeting, parrying
+RANKS: Introduced at 3rd Kyu
+NOTES: Concealable and versatile, used for both offense and defense.
+
+[WEAPON] Kunai
+ALIASES: kunai, utility blade, digging knife
+TYPE: Multipurpose tool weapon
+CORE ACTIONS: stabbing, hooking, tearing, leverage-based locks
+RANKS: Introduced at 3rd Kyu
+NOTES: Often paired with climbing or entanglement techniques.
+
+[WEAPON] Shuko
+ALIASES: shuko, hand claws, shukō
+TYPE: Metal climbing/retention claws
+CORE ACTIONS: gripping, tearing, climbing, close-quarters striking
+RANKS: Introduced at 2nd Kyu
+NOTES: Historically associated with climbing and ambush scenarios, used defensively in kata.
+
+[WEAPON] Jutte
+ALIASES: jutte, sai, jitte
+TYPE: Short metal rod with a side hook, primarily for defense, particularly against swords
+CORE ACTIONS: blocking, disarming, hooking, striking
+RANKS: Introduced at 3rd Kyu
+NOTES: Can be used to block and trap sword strikes, and as a baton to strike, disarm, or manipulate an opponent's joints.
