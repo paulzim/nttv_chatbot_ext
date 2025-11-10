@@ -3,17 +3,17 @@ import re
 from typing import List, Dict, Any, Optional
 
 # ----------------------------
-# Aliases & normalization
+# Aliases & normalization  (preserved/extended)
 # ----------------------------
 WEAPON_ALIASES = {
     "hanbo": ["hanbo", "hanbō", "short staff", "three-foot staff", "3-foot staff"],
-    "rokushakubo": ["rokushakubo", "rokushaku bo", "rokushaku-bō", "bo", "long staff", "rokushaku"],
+    "rokushakubo": ["rokushakubo", "rokushaku bo", "rokushaku-bō", "bo", "long staff", "rokushaku", "rokushaku staff"],
     "katana": ["katana", "sword", "daito", "daitō"],
     "tanto": ["tanto", "dagger", "knife"],
     "shoto": ["shoto", "short sword", "shōtō"],
-    "kusari fundo": ["kusari fundo", "kusarifundo", "manriki-gusari", "manrikigusari", "weighted chain"],
+    "kusari fundo": ["kusari fundo", "kusarifundo", "manriki-gusari", "manrikigusari", "weighted chain", "kusari-fundo"],
     "naginata": ["naginata"],
-    "kyoketsu shoge": ["kyoketsu shoge", "kyoketsu-shoge", "kyoketsu shōge"],
+    "kyoketsu shoge": ["kyoketsu shoge", "kyoketsu-shoge", "kyoketsu shōge", "kyoketsu-shōge"],
     "shuko": ["shuko", "shukō", "hand claws"],
     "jutte": ["jutte", "jitte", "sai"],
     "tessen": ["tessen", "iron fan"],
@@ -44,56 +44,71 @@ BULLET = re.compile(r"^\s*[•\-\u2022]\s*(.+?)\s*$")
 def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "").strip())
 
+def _strip_macrons(s: str) -> str:
+    return (s or "").translate(str.maketrans({
+        "ō":"o","ū":"u","ā":"a","ī":"i","Ō":"O","Ū":"U","Ā":"A","Ī":"I"
+    }))
+
 def _weapon_key_from_query(q: str) -> Optional[str]:
-    ql = q.lower()
+    ql = _strip_macrons(q.lower())
     for key, aliases in WEAPON_ALIASES.items():
         for a in aliases:
-            if a in ql:
+            if _strip_macrons(a).lower() in ql:
                 return key
-    # If they asked generic “weapons”, leave None → answer more carefully
     return None
 
 # ----------------------------
 # Parse [WEAPON] blocks from "NTTV Weapons Reference.txt"
 # ----------------------------
-def _parse_structured_weapons(passages: List[Dict[str, Any]]) -> List[Dict[str, str]]:
-    rows: List[Dict[str, str]] = []
+def _extract_weapon_structured_blob(passages: List[Dict[str, Any]]) -> str:
+    parts = []
     for p in passages:
-        if "weapons reference" not in (p.get("source") or "").lower():
-            continue
-        text = p.get("text") or ""
-        lines = text.splitlines()
-        i = 0
-        while i < len(lines):
-            m = WEAPON_HEADER.match(lines[i])
-            if not m:
-                i += 1
-                continue
-            current: Dict[str, str] = {"NAME": _norm(m.group(1))}
+        src = (p.get("source") or "").lower()
+        if "weapons reference" in src:
+            parts.append(p.get("text") or "")
+    return "\n".join(parts)
+
+def _parse_structured_weapons(blob: str) -> List[Dict[str, str]]:
+    """
+    Parse all [WEAPON] ... blocks into a list of dicts with labeled fields.
+    """
+    rows: List[Dict[str, str]] = []
+    if not blob:
+        return rows
+
+    lines = blob.splitlines()
+    i = 0
+    while i < len(lines):
+        m = WEAPON_HEADER.match(lines[i])
+        if not m:
             i += 1
-            while i < len(lines):
-                ln = lines[i].strip()
-                if not ln:
-                    break
-                if WEAPON_HEADER.match(ln):
-                    break
-                f = FIELD_LINE.match(lines[i])
-                if f:
-                    field = f.group(1).upper()
-                    val = _norm(f.group(2))
-                    current[field] = val
-                i += 1
-            rows.append(current)
-        # keep scanning in case file repeated
+            continue
+        current: Dict[str, str] = {"NAME": _norm(m.group(1))}
+        i += 1
+        while i < len(lines):
+            ln = lines[i].strip()
+            if not ln:
+                break
+            if WEAPON_HEADER.match(ln):
+                break
+            f = FIELD_LINE.match(lines[i])
+            if f:
+                field = f.group(1).upper()
+                val = _norm(f.group(2))
+                current[field] = val
+            i += 1
+        # expand aliases from the field, but preserve global table for matching
+        if "ALIASES" in current:
+            current["ALIASES"] = ", ".join([a.strip() for a in current["ALIASES"].split(",") if a.strip()])
+        rows.append(current)
     return rows
 
 def _find_structured_weapon(rows: List[Dict[str, str]], target_key: str) -> Optional[Dict[str, str]]:
-    aliases = WEAPON_ALIASES.get(target_key, [])
+    aliases = [a.lower() for a in WEAPON_ALIASES.get(target_key, [])]
     for r in rows:
-        name_l = r.get("NAME", "").lower()
+        name_l = _strip_macrons(r.get("NAME", "")).lower()
         if any(a in name_l for a in aliases):
             return r
-        # also match if canonical key appears (loose)
         if target_key.replace("_", " ") in name_l:
             return r
     return None
@@ -103,7 +118,7 @@ def _find_structured_weapon(rows: List[Dict[str, str]], target_key: str) -> Opti
 # ----------------------------
 def _scan_rank_weapon_blocks_all(passages: List[Dict[str, Any]]) -> Dict[str, List[str]]:
     """
-    Build a dict like {"8th kyu": ["Hanbo", "Tanto"], ...} from nttv training reference.
+    Build a dict like {"8th Kyu": ["Hanbo", "Tanto"], ...} from nttv training reference.
     Looks for rank headers followed by WEAPON(S) lines and bullets.
     """
     out: Dict[str, List[str]] = {}
@@ -114,24 +129,20 @@ def _scan_rank_weapon_blocks_all(passages: List[Dict[str, Any]]) -> Dict[str, Li
         current_rank = None
         i = 0
         while i < len(lines):
-            # detect rank header
             rh = RANK_HEAD.match(lines[i])
             if rh:
-                current_rank = rh.group(1).title()  # normalize casing
+                current_rank = rh.group(1).title()
                 if current_rank not in out:
                     out[current_rank] = []
                 i += 1
                 continue
-            # within a rank section, capture WEAPON(S)
             if current_rank:
                 m = WEAPONS_BLOCK_HEAD.match(lines[i])
                 if m:
-                    # inline header text may already include some names
                     header_inline = _norm(m.group(1))
                     if header_inline:
                         out[current_rank].extend(_split_list(header_inline))
                     j = i + 1
-                    # capture following bullets
                     while j < len(lines):
                         ln = lines[j].strip()
                         if not ln:
@@ -145,7 +156,7 @@ def _scan_rank_weapon_blocks_all(passages: List[Dict[str, Any]]) -> Dict[str, Li
                     i = j
                     continue
             i += 1
-    # tidy
+    # de-dup & tidy
     for rk, vals in out.items():
         seen, clean = set(), []
         for v in vals:
@@ -157,20 +168,23 @@ def _scan_rank_weapon_blocks_all(passages: List[Dict[str, Any]]) -> Dict[str, Li
 
 def _split_list(s: str) -> List[str]:
     parts = [p.strip(" \t-•") for p in re.split(r"[;,/]| and ", s) if p.strip()]
-    # Basic normalization for a few common forms
     normed = []
     for p in parts:
-        low = p.lower()
+        low = _strip_macrons(p.lower())
         if "hanb" in low and "hanbo" not in low:
             normed.append("Hanbo"); continue
-        if low in ("bo", "bō", "rokushaku", "rokushaku bo"):
+        if low in ("bo", "bō", "rokushaku", "rokushaku bo", "rokushaku staff"):
             normed.append("Rokushakubo"); continue
         if "shoto" in low or "shōtō" in low:
             normed.append("Shoto"); continue
         if "tanto" in low or "knife" in low:
             normed.append("Tanto"); continue
-        if "senban" in low or "shaken" in low or "shuriken" in low:
+        if "senban" in low or "shaken" in low or "shuriken" in low or "throwing star" in low or "throwing spike" in low:
             normed.append("Shuriken"); continue
+        if "kusari" in low and "fundo" in low:
+            normed.append("Kusari Fundo"); continue
+        if "kyoketsu" in low and "shoge" in low:
+            normed.append("Kyoketsu Shoge"); continue
         normed.append(p.title())
     return normed
 
@@ -178,12 +192,12 @@ def _split_list(s: str) -> List[str]:
 # Glossary fallback
 # ----------------------------
 def _glossary_one_liner(passages: List[Dict[str, Any]], target_key: str) -> Optional[str]:
-    aliases = WEAPON_ALIASES.get(target_key, [])
+    aliases = [a.lower() for a in WEAPON_ALIASES.get(target_key, [])]
     for p in passages:
         if "glossary" not in (p.get("source") or "").lower():
             continue
         for line in (p.get("text") or "").splitlines():
-            ll = line.lower().strip()
+            ll = _strip_macrons(line.lower().strip())
             if any(a in ll for a in aliases):
                 clean = _norm(line)
                 # "Term - definition" or "Term – definition"
@@ -198,91 +212,112 @@ def _glossary_one_liner(passages: List[Dict[str, Any]], target_key: str) -> Opti
     return None
 
 # ----------------------------
-# Public API
+# Public deterministic answers
 # ----------------------------
-def try_answer_weapons(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
+def try_answer_weapon_rank(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
     """
-    Deterministic weapon explainer with structured fields support:
-      1) Prefer [WEAPON] blocks in 'NTTV Weapons Reference.txt'
-      2) Else summarize rank WEAPON(S) blocks
-      3) Else glossary one-liner
-      4) For shuriken, append a compact technique hint
-    Also exposes auto-built rank→weapons mapping via try_build_rank_weapon_map(passages).
+    Answer: 'Kusari Fundo is introduced at 4th Kyu.' (or nearest equivalent)
+    Preference order:
+      1) RANKS field in [WEAPON] block from NTTV Weapons Reference.txt
+      2) First rank in WEAPONS list for that weapon from nttv training reference.txt
+      3) Glossary (if at least defines, but then no rank will be stated)
     """
-    ql = question.lower()
-    target = _weapon_key_from_query(ql)
+    target = _weapon_key_from_query(question)
+    if not target:
+        return None
 
-    # (A) Structured file
-    structured = _parse_structured_weapons(passages)
-    if target and structured:
-        hit = _find_structured_weapon(structured, target)
-        if hit:
-            # Build a compact, ordered sentence set
-            parts = []
-            name = hit.get("NAME", "").strip() or target.replace("_", " ").title()
-            parts.append(name + ":")
-            for field in FIELD_ORDER:
-                if hit.get(field):
-                    label = field.title().replace("/", " / ")
-                    parts.append(f"{label}: {hit[field]}.")
-            if target == "shuriken":
-                parts.append(SHURIKEN_HINT)
-            return " ".join(parts).strip()
+    # (1) Structured reference
+    blob = _extract_weapon_structured_blob(passages)
+    rows = _parse_structured_weapons(blob)
+    if rows:
+        hit = _find_structured_weapon(rows, target)
+        if hit and hit.get("RANKS"):
+            name = hit.get("NAME", target.title())
+            ranks = hit["RANKS"]
+            # Normalize phrasing a bit
+            intro = ranks
+            if any(k in ranks.lower() for k in ["introduced at", "learn at", "start at"]):
+                intro = ranks
+            else:
+                intro = f"Introduced at {ranks}"
+            return f"{name} is {intro}."
 
-    # (B) Rank WEAPONS block summary (works with or without target)
-    rank_summary = _rank_weapons_summary(passages, target)
-    if rank_summary:
-        if target == "shuriken":
-            return f"{rank_summary} {SHURIKEN_HINT}"
-        return rank_summary
+    # (2) Rank WEAPONS map
+    table = _scan_rank_weapon_blocks_all(passages)
+    if table:
+        first_rank = _first_rank_for_weapon(table, target)
+        if first_rank:
+            return f"{_display_name_for_target(rows, target)} is introduced at {first_rank}."
 
-    # (C) Glossary fallback (targeted)
-    if target:
-        gloss = _glossary_one_liner(passages, target)
-        if gloss:
-            if target == "shuriken":
-                return f"{gloss} {SHURIKEN_HINT}"
-            return gloss
-
-    # (D) Generic shuriken ask
-    if any(a in ql for a in WEAPON_ALIASES["shuriken"]):
-        return SHURIKEN_HINT
+    # (3) Glossary fallback (definition only)
+    gloss = _glossary_one_liner(passages, target)
+    if gloss:
+        return gloss
 
     return None
 
-def _rank_weapons_summary(passages: List[Dict[str, Any]], target_key: Optional[str]) -> Optional[str]:
+def try_answer_weapon_profile(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
     """
-    Produce a short sentence describing weapons per rank,
-    filtered to the target if provided.
+    Short profile: 'Kusari Fundo: TYPE … Core actions include …'
     """
-    table = _scan_rank_weapon_blocks_all(passages)
-    if not table:
+    target = _weapon_key_from_query(question)
+    if not target:
         return None
 
-    lines = []
+    # Prefer structured reference
+    blob = _extract_weapon_structured_blob(passages)
+    rows = _parse_structured_weapons(blob)
+    if rows:
+        hit = _find_structured_weapon(rows, target)
+        if hit:
+            name = hit.get("NAME", target.title())
+            parts = [f"{name}"]
+            if hit.get("TYPE"):
+                parts.append(f": {hit['TYPE']}")
+            # Include a few key fields
+            for field in ["CORE ACTIONS", "DISTANCE", "RANGE", "TARGETS", "NOTES"]:
+                if hit.get(field):
+                    label = field.title().replace("/", " / ")
+                    if field == "CORE ACTIONS":
+                        parts.append(f". Core actions include {hit[field].lower()}")
+                    else:
+                        parts.append(f". {label}: {hit[field]}")
+            return "".join(parts).strip() + "."
+
+    # Glossary definition as last resort
+    gloss = _glossary_one_liner(passages, target)
+    if gloss:
+        return gloss
+
+    return None
+
+# ----------------------------
+# Helpers
+# ----------------------------
+def _rank_sort_key(rank: str) -> int:
+    m = re.search(r"(\d{1,2})", rank)
+    return int(m.group(1)) if m else 99
+
+def _first_rank_for_weapon(table: Dict[str, List[str]], target_key: str) -> Optional[str]:
+    # Find the lowest-numbered kyu that lists the weapon (by alias)
+    aliases = [a.lower() for a in WEAPON_ALIASES.get(target_key, [])]
+    best = None
     for rank in sorted(table.keys(), key=_rank_sort_key):
         weapons = table[rank]
-        if target_key:
-            aliases = WEAPON_ALIASES.get(target_key, [])
-            sel = [w for w in weapons if any(a in w.lower() for a in aliases) or target_key.replace("_", " ") in w.lower()]
-            if sel:
-                lines.append(f"{rank}: {', '.join(sel[:6])}.")
-        else:
-            if weapons:
-                lines.append(f"{rank}: {', '.join(weapons[:6])}.")
-    if not lines:
-        return None
+        for w in weapons:
+            wl = _strip_macrons(w.lower())
+            if any(a in wl for a in aliases) or target_key.replace("_", " ") in wl:
+                best = rank
+                break
+        if best:
+            break
+    return best
 
-    # Keep it tight: join up to ~3 ranks
-    return " ".join(lines[:3])
-
-def _rank_sort_key(rank: str) -> int:
-    # Convert "8th Kyu" → 8 (lower is lower rank)
-    m = re.search(r"(\d{1,2})", rank)
-    if m:
-        return int(m.group(1))
-    return 99
-
-# Exposed helper: build full rank→weapons map (pass the app’s CHUNKS if you want global)
-def try_build_rank_weapon_map(passages_or_chunks: List[Dict[str, Any]]) -> Dict[str, List[str]]:
-    return _scan_rank_weapon_blocks_all(passages_or_chunks)
+def _display_name_for_target(rows: List[Dict[str, str]], target_key: str) -> str:
+    if rows:
+        # Show the first structured NAME that matches the target
+        hit = _find_structured_weapon(rows, target_key)
+        if hit and hit.get("NAME"):
+            return hit["NAME"]
+    # Fallback: title-case canonical key
+    return target_key.title().replace("_", " ")

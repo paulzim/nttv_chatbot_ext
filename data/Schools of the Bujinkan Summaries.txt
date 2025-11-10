@@ -1,5 +1,109 @@
 Schools of the Bujinkan Summaries
 
+SCHOOL: Togakure-ryū
+ALIASES: Togakure-ryu, Togakure, Togakure Ninpo Taijutsu, Togakure-ryu Ninpo
+TRANSLATION: Hidden Door School
+TYPE: Ninjutsu
+FOCUS: stealth, infiltration, evasion, observation/adaptation, ninpo taijutsu
+WEAPONS: senban shuriken, shuko, ashiko, shinodake, kyoketsu-shoge
+KEY POINTS:
+- Emphasizes concealment, escape, and using the environment to avoid direct conflict.
+- Trains specialized tools and deceptive tactics for close, quiet work.
+- Prioritizes awareness, distance, and survival over dueling.
+
+SCHOOL: Gyokko-ryū
+ALIASES: Gyokko-ryu, Gyokko, Gyokko-ryu Kosshijutsu
+TRANSLATION: Jewel Tiger School
+TYPE: Samurai
+FOCUS: kosshijutsu (muscle/nerve striking), distance/timing, kamae structure
+WEAPONS: primarily taijutsu focus; small tools context-dependent
+KEY POINTS:
+- Strong influence on Sanshin no Kata and Kihon Happo fundamentals.
+- Uses precise strikes (fingers/toes) to weak points to disrupt structure.
+- Teaches refined distancing and angling to break an opponent’s balance.
+
+SCHOOL: Koto-ryū
+ALIASES: Koto-ryu, Koto, Koto-ryu Koppojutsu
+TRANSLATION: Tiger Knocking Down School
+TYPE: Samurai
+FOCUS: koppojutsu (bone attacks/breaking), direct footwork, sharp angling
+WEAPONS: short blades and close-range tools as context demands
+KEY POINTS:
+- Prioritizes decisive entries, bone targeting, and fast structural breaks.
+- Cross-stepping and crisp angles to create sudden, damaging openings.
+- Complements Gyokko-ryū by targeting skeletal structure rather than soft tissue.
+
+SCHOOL: Shinden Fudō-ryū
+ALIASES: Shinden Fudo-ryu, Shinden Fudō-ryū Dakentaijutsu, Shinden Fudō-ryū Jūtaijutsu
+TRANSLATION: Immovable Heart School
+TYPE: Samurai
+FOCUS: natural body mechanics, dakentaijutsu (striking) and jutaijutsu (grappling), kamae from nature
+WEAPONS: staff/stone-age tools context; pragmatic weapon use
+KEY POINTS:
+- Builds power from relaxed, natural posture rather than fixed forms.
+- Two streams (dakentaijutsu and jutaijutsu) cover striking and grappling.
+- Emphasizes adaptability from “no-form” principles.
+
+SCHOOL: Kukishinden-ryū
+ALIASES: Kukishinden-ryu, Kukishinden, Kukishinden-ryū Happō Hikenjutsu
+TRANSLATION: Nine Demon Gods School
+TYPE: Samurai
+FOCUS: happō hikenjutsu (eight methods + secret sword), weapon integration, battlefield tactics
+WEAPONS: rokushakubō (bo), hanbō, naginata, spear, sword, staff variants, rope/chain
+KEY POINTS:
+- Broad battlefield system integrating weapons and taijutsu.
+- Bojutsu is a signature element; timing and range control are central.
+- Teaches transitions between armed and unarmed engagement.
+
+SCHOOL: Takagi Yōshin-ryū
+ALIASES: Takagi Yoshin-ryu, Takagi Yōshin Ryū, Takagi Yoshin
+TRANSLATION: High Tree, Raised Heart School
+TYPE: Samurai
+FOCUS: jutaijutsu (grappling), close-quarters control, throws/restraints
+WEAPONS: small side-arms context; emphasis on clinch control
+KEY POINTS:
+- Oriented to indoor/armored grappling and controlling confined spaces.
+- Emphasizes posture breaking, folds/locks, and safe takedowns.
+- Known for practical body handling and positioning.
+
+SCHOOL: Gikan-ryū
+ALIASES: Gikan-ryu, Gikan
+TRANSLATION: Truth, Loyalty, & Justice School
+TYPE: Samurai
+FOCUS: koppo/striking methods, unusual angling/footwork, preservation of rare kata
+WEAPONS: context-dependent
+KEY POINTS:
+- Traditionally rare curriculum with distinctive timing and stepping.
+- Emphasizes precise power delivery and structural disruption.
+- Known for unconventional entries that protect the body while striking.
+
+SCHOOL: Gyokushin-ryū
+ALIASES: Gyokushin-ryu, Gyokushin, Gyokshin
+TRANSLATION: Jeweled Heart School
+TYPE: Ninjutsu
+FOCUS: intelligence-gathering, deception, soft movement, environmental use
+WEAPONS: light tools for misdirection and escape
+KEY POINTS:
+- Prioritizes information, deception, and non-forceful solutions.
+- Trains subtle movement and sensitivity to avoid escalation.
+- Complements physical methods with strategy and guile.
+
+SCHOOL: Kumogakure-ryū
+ALIASES: Kumogakure-ryu, Kumogakure
+TRANSLATION: Hiding in the Clouds School
+TYPE: Ninjutsu
+FOCUS: concealment, surprise tactics, misdirection, environmental camouflage
+WEAPONS: specialized tools for climbing, concealment, thrown items
+KEY POINTS:
+- Centers on vanishing/appearing tactics and battlefield deception.
+- Uses terrain, weather, and noise discipline to control encounters.
+- Reinforces ninjutsu principles of survival and non-detection.
+
+
+
+----
+
+
 The schools of the Bujinkan are: 
 
 Togakure-ryū

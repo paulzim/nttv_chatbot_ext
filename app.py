@@ -12,7 +12,9 @@ from openai import OpenAI
 
 from extractors import try_extract_answer
 from extractors.leadership import try_extract_answer as try_leadership
-from extractors.schools import try_answer_school_profile  # NEW
+from extractors.schools import try_answer_school_profile  
+from extractors.weapons import try_answer_weapon_rank  
+
 
 # CPU embeddings
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "-1")
@@ -91,7 +93,29 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
         ask_boshi = ("boshi ken" in q_low) or ("shito ken" in q_low)
         has_boshi = ("boshi ken" in t_low) or ("shito ken" in t_low)
         if ask_boshi and has_boshi: qt_boost += 0.45
+        
+        # ---- Strong query-aware boost for weapons Qs when chunk looks like weapons content
+        weapon_terms = [
+            "hanbo","hanbō","rokushakubo","rokushaku","katana","tanto","shoto","shōtō",
+            "kusari","fundo","kusari fundo","kyoketsu","shoge","shōge","shuko","shukō",
+            "jutte","jitte","tessen","kunai","shuriken","senban","shaken"
+        ]
+        ask_weapon = (
+            any(w in q_low for w in weapon_terms)
+            or ("weapon" in q_low) or ("weapons" in q_low)
+            or ("what rank" in q_low) or ("introduced at" in q_low)
+            or ("when do i learn" in q_low)
+        )
+        has_weaponish = any(w in t_low for w in weapon_terms) or ("[weapon]" in t_low) or ("weapons reference" in t_low)
+        if ask_weapon and has_weaponish:
+            qt_boost += 0.55
 
+        # Filename heuristic: prefer the Weapons Reference / Glossary for weapons questions
+        fname = os.path.basename(meta.get("source", "")).lower()
+        if ask_weapon and ("weapons reference" in fname or "glossary" in fname):
+            qt_boost += 0.25
+
+        # ---- Schools / ryū boost
         school_aliases = [
             "gyokko-ryu","gyokko ryu","gyokko-ryū","gyokko ryū",
             "koto-ryu","koto ryu","koto-ryū","koto ryū",
@@ -106,22 +130,15 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
         if any(a in q_low for a in school_aliases) and any(a in t_low for a in school_aliases):
             qt_boost += 0.45
 
+        # ---- Leadership boost
         ask_soke = any(t in q_low for t in ["soke","sōke","grandmaster","headmaster","current head","current grandmaster"])
         has_soke = ("[sokeship]" in t_low) or (" soke" in t_low) or (" sōke" in t_low)
-        fname = os.path.basename(meta.get("source", "")).lower()
         if ask_soke and (has_soke or "leadership" in fname):
             qt_boost += 0.60
-            if "leadership" in fname: qt_boost += 0.20
+            if "leadership" in fname:
+                qt_boost += 0.20
 
-        weapon_terms = [
-            "hanbo","hanbō","rokushakubo","rokushaku","katana","tanto","shoto",
-            "kusari fundo","naginata","kyoketsu shoge","shuko","jutte","tessen",
-            "kunai","shuriken","senban","shaken"
-        ]
-        ask_weapon = any(w in q_low for w in weapon_terms) or ("weapon" in q_low) or ("weapons" in q_low)
-        has_weapon = any(w in t_low for w in weapon_terms) or ("[weapon]" in t_low) or ("weapons reference" in t_low)
-        if ask_weapon and has_weapon: qt_boost += 0.30
-
+        # ---- Offtopic penalties, lore penalty, length penalty stay as-is...
         offtopic_penalty = 0.0
         if "kihon happo" in q_low and "kyusho" in t_low: offtopic_penalty += 0.15
         if "kyusho" in q_low and "kihon happo" in t_low: offtopic_penalty += 0.15
@@ -133,9 +150,12 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
 
         length_penalty = min(len(text) / 2000.0, 0.3)
 
+        # ---- Exact rank match boost
         rank_boost = 0.0
         for rank in ["10th kyu","9th kyu","8th kyu","7th kyu","6th kyu","5th kyu","4th kyu","3rd kyu","2nd kyu","1st kyu"]:
-            if rank in q_low and rank in t_low: rank_boost += 0.50
+            if rank in q_low and rank in t_low:
+                rank_boost += 0.50
+
 
         new_score = (float(score) + priority_boost + keyword_boost + qt_boost + rank_boost
                      - length_penalty - offtopic_penalty - lore_penalty)
@@ -235,6 +255,35 @@ def inject_schools_passage_if_needed(question: str, hits: List[Dict[str, Any]]) 
         "page": None, "score": 1.0, "rerank_score": 997.0,
     }
     return [synth] + hits
+
+def inject_weapons_passage_if_needed(question: str, hits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Prepend the full NTTV Weapons Reference when the question mentions a weapon or 'rank/learn' for weapons."""
+    ql = question.lower()
+    # Light heuristic: any weapon-ish query or keywords
+    weapon_triggers = [
+        "hanbo","hanbō","rokushakubo","rokushaku","katana","tanto","shoto","shōtō",
+        "kusari","fundo","kusari fundo","kyoketsu","shoge","shōge","shuko","shukō",
+        "jutte","jitte","tessen","kunai","shuriken","senban","shaken","throwing star","throwing spike",
+        "weapon","weapons","what rank","when do i learn","introduced at"
+    ]
+    if not any(t in ql for t in weapon_triggers):
+        return hits
+
+    # Gather the *entire* Weapons Reference text (concatenate all chunks)
+    txt, path = _gather_full_text_for_source("weapons reference")
+    if not txt:
+        return hits
+
+    synth = {
+        "text": txt,
+        "meta": {"priority": 1, "source": path or "NTTV Weapons Reference (synthetic)"},
+        "source": path or "NTTV Weapons Reference (synthetic)",
+        "page": None,
+        "score": 1.0,
+        "rerank_score": 996.0,  # high so it sits right under leadership/schools injects
+    }
+    return [synth] + hits
+
 
 # -------------------- Prompting / LLM --------------------
 STRICT_SYSTEM = (
@@ -367,6 +416,7 @@ def answer_with_rag(question: str):
     hits = inject_rank_passage_if_needed(question, hits)
     hits = inject_leadership_passage_if_needed(question, hits)
     hits = inject_schools_passage_if_needed(question, hits)
+    hits = inject_weapons_passage_if_needed(question, hits) 
 
     client = OpenAI(base_url=BASE_URL, api_key=API_KEY)
 
@@ -377,6 +427,16 @@ def answer_with_rag(question: str):
         except Exception: fact = None
         if fact:
             return f"🔒 Strict (context-only, explain)\n\n{fact}", hits, '{"det_path":"leadership/soke"}'
+
+    # Weapon rank questions: return a single factual line, no LLM
+    wr = None
+    try:
+        wr = try_answer_weapon_rank(question, hits)
+    except Exception:
+        wr = None
+    if wr:
+        return f"🔒 Strict (context-only)\n\n{wr}", hits, '{"det_path":"weapons/rank"}'
+
 
     # Deterministic rank/kyusho/etc.
     fact = try_extract_answer(question, hits)
