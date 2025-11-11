@@ -78,6 +78,64 @@ def _pick_rank_passages(passages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     rp = [p for p in passages if "rank requirements" in (p.get("source") or "").lower()]
     return rp if rp else passages
 
+def _collect_fields(rank_block: str) -> Dict[str, List[str]]:
+    data: Dict[str, List[str]] = {}
+    if not rank_block:
+        return data
+    lines = rank_block.splitlines()
+    i = 0
+    while i < len(lines):
+        ln = lines[i]
+        m = _FIELD_RX.match(ln)
+        if m:
+            field = m.group(1).lower()
+            val = m.group(2)
+            j = i + 1
+            cont: List[str] = []
+            while j < len(lines):
+                nxt = lines[j]
+                if not nxt.strip() or _FIELD_RX.match(nxt):
+                    break
+                cont.append(nxt.strip())
+                j += 1
+            if cont:
+                val = val + " " + " ".join(cont)
+            items = [x for x in _split_items(val) if x]  # <-- filter empties
+            if items:                                    # <-- skip empty fields
+                data[field] = items
+            i = j
+            continue
+        i += 1
+    return data
+
+
+def _render_rank_summary(rank_label: str, fields: Dict[str, List[str]]) -> Optional[str]:
+    if not fields:
+        return None
+    order = [
+        "weapon", "weapon kamae", "weapon strikes", "cuts", "draws", "evasions", "weapon spinning",
+        "kamae", "ukemi", "kaiten", "taihenjutsu", "blocking", "striking",
+        "grappling and escapes", "kihon happo", "san shin no kata",
+        "nage waza", "jime waza", "kyusho", "other"
+    ]
+    lines = [f"{rank_label.title()} — key requirements:"]
+    for f in order:
+        if f in fields and fields[f]:
+            pretty = f.title().replace("And Escapes", "& Escapes")
+            pretty = pretty.replace("San Shin No Kata", "Sanshin no Kata")
+            vals = "; ".join(fields[f])
+            lines.append(f"- {pretty}: {vals}")
+    return "\n".join(lines)
+
+# Relaxed intent to catch “what do I learn at 3rd kyu (weapons)”
+_WEAPON_INTENT = re.compile(
+    r"\b(weapon|weapons|buki|sword|katana|tanto|bokken|bo|hanbo|staff|stick|yari|naginata|shuriken|"
+    r"kusari(?:\s*fundo)?|rope|shoge|kyoketsu(?:\s*shoge)?)\b"
+    r"|what\s+weapons|weapons\s+at\s+\d+(?:st|nd|rd|th)?\s+kyu",
+    re.I
+)
+
+
 # ---------- Rank REQUIREMENTS (entire block slicer) ----------
 _FIELD_HEADS = [
     "weapon", "weapon kamae", "weapon strikes", "cuts", "draws", "evasions", "weapon spinning",

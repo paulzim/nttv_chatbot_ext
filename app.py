@@ -2,7 +2,6 @@
 import os
 import json
 import pickle
-import time
 from typing import List, Dict, Any, Optional, Tuple
 
 import numpy as np
@@ -20,12 +19,12 @@ try:
 except Exception:
     SentenceTransformer = None
 
-# Deterministic extractors
+# Deterministic extractors (dispatcher + specific modules)
 from extractors import try_extract_answer
-from extractors.schools import try_answer_school_profile
 from extractors.leadership import try_extract_answer as try_leadership
 from extractors.weapons import try_answer_weapon_rank
 from extractors.rank import try_answer_rank_requirements
+from extractors.schools import try_answer_school_profile, SCHOOL_ALIASES
 
 # ---------------------------
 # Load index & metadata
@@ -113,7 +112,7 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
         if "kihon happo" in q_low and "kihon happo" in t_low:
             qt_boost += 0.60
 
-        # Sanshin (catch "sanshin", "san shin", "sanshin no kata")
+        # Sanshin
         ask_sanshin = ("sanshin" in q_low) or ("san shin" in q_low)
         has_sanshin = ("sanshin" in t_low) or ("san shin" in t_low) or ("sanshin no kata" in t_low)
         if ask_sanshin and has_sanshin:
@@ -129,7 +128,7 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
         if ask_boshi and has_boshi:
             qt_boost += 0.45
 
-        # ---- Strong query-aware boost for weapons Qs when chunk looks like weapons content
+        # Weapons cues
         weapon_terms = [
             "hanbo","hanbō","rokushakubo","rokushaku","katana","tanto","shoto","shōtō",
             "kusari","fundo","kusari fundo","kyoketsu","shoge","shōge","shuko","shukō",
@@ -145,27 +144,19 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
         if ask_weapon and has_weaponish:
             qt_boost += 0.55
 
-        # Filename heuristic: prefer the Weapons Reference / Glossary for weapons questions
+        # Filename heuristic: prefer Weapons Reference / Glossary for weapons Qs
         fname = os.path.basename(meta.get("source", "")).lower()
         if ask_weapon and ("weapons reference" in fname or "glossary" in fname):
             qt_boost += 0.25
 
-        # ---- Schools / ryū boost
-        school_aliases = [
-            "gyokko-ryu","gyokko ryu","gyokko-ryū","gyokko ryū",
-            "koto-ryu","koto ryu","koto-ryū","koto ryū",
-            "togakure-ryu","togakure ryu","togakure-ryū","togakure ryū",
-            "shinden fudo-ryu","shinden fudo ryu","shinden fudō-ryū","shinden fudō ryū",
-            "kukishinden-ryu","kukishinden ryu","kukishinden-ryū","kukishinden ryū",
-            "takagi yoshin-ryu","takagi yoshin ryu","takagi yōshin-ryū","takagi yōshin ryū",
-            "gikan-ryu","gikan ryu","gikan-ryū","gikan ryū",
-            "gyokushin-ryu","gyokushin ryu","gyokushin-ryū","gyokushin ryū",
-            "kumogakure-ryu","kumogakure ryu","kumogakure-ryū","kumogakure ryū",
-        ]
+        # Schools / ryū boost
+        school_aliases = []
+        for canon, aliases in SCHOOL_ALIASES.items():
+            school_aliases.extend([canon.lower()] + [a.lower() for a in aliases])
         if any(a in q_low for a in school_aliases) and any(a in t_low for a in school_aliases):
             qt_boost += 0.45
 
-        # ---- Leadership boost
+        # Leadership boost
         ask_soke = any(t in q_low for t in ["soke","sōke","grandmaster","headmaster","current head","current grandmaster"])
         has_soke = ("[sokeship]" in t_low) or (" soke" in t_low) or (" sōke" in t_low)
         if ask_soke and (has_soke or "leadership" in fname):
@@ -173,7 +164,7 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
             if "leadership" in fname:
                 qt_boost += 0.20
 
-        # ---- Offtopic penalties / lore / length
+        # Offtopic penalties / lore / length
         offtopic_penalty = 0.0
         if "kihon happo" in q_low and "kyusho" in t_low: offtopic_penalty += 0.15
         if "kyusho" in q_low and "kihon happo" in t_low: offtopic_penalty += 0.15
@@ -185,13 +176,12 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
 
         length_penalty = min(len(text) / 2000.0, 0.3)
 
-        # ---- Exact rank match boost
+        # Exact rank match
         rank_boost = 0.0
         for rank in ["10th kyu","9th kyu","8th kyu","7th kyu","6th kyu","5th kyu","4th kyu","3rd kyu","2nd kyu","1st kyu"]:
             if rank in q_low and rank in t_low:
                 rank_boost += 0.50
 
-        # ---- Final rerank score
         new_score = (float(score)
                      + priority_boost
                      + keyword_boost
@@ -321,18 +311,10 @@ def inject_weapons_passage_if_needed(question: str, hits: List[Dict[str, Any]]) 
     return [synth] + hits
 
 # ---------------------------
-# LLM backend
+# LLM backend (fallback)
 # ---------------------------
 def call_llm(prompt: str, system: str = "You are a precise assistant. Use only the provided context.") -> Tuple[str, str]:
-    """
-    Minimal OpenAI/OpenRouter/LM Studio fallback.
-    Reads from environment:
-      - OPENAI_API_KEY or OPENROUTER_API_KEY
-      - OPENAI_BASE_URL / OPENROUTER_API_BASE or LM Studio at http://localhost:1234/v1
-      - MODEL (e.g., openrouter/anthropic/sonnet, gpt-4o-mini, etc.)
-    """
     import requests
-
     model = os.environ.get("MODEL", "gpt-4o-mini")
     api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
     base = os.environ.get("OPENAI_BASE_URL") or os.environ.get("OPENROUTER_API_BASE") or os.environ.get("LM_STUDIO_BASE_URL") or "http://localhost:1234/v1"
@@ -361,7 +343,7 @@ def call_llm(prompt: str, system: str = "You are a precise assistant. Use only t
         return "", f'{{"error":"{type(e).__name__}","detail":"{str(e)}"}}'
 
 # ---------------------------
-# Answer planner
+# Prompt & answer planner
 # ---------------------------
 def build_prompt(context: str, question: str) -> str:
     return (
@@ -372,6 +354,59 @@ def build_prompt(context: str, question: str) -> str:
         "Answer:"
     )
 
+# ---------------------------
+# UI helpers for deterministic rendering
+# ---------------------------
+def _apply_tone(text: str, tone: str) -> str:
+    if tone == "Chatty":
+        if "\n" not in text.strip():
+            return text.strip() + " Hope that helps—want a quick example or drill, too?"
+        return text
+    return text
+
+def _bullets_to_paragraph(text: str) -> str:
+    lines = [ln.strip() for ln in text.strip().splitlines() if ln.strip()]
+    if not lines:
+        return text
+    head = lines[0]
+    body = []
+    for ln in lines[1:]:
+        if ln.startswith("- "):
+            ln = ln[2:]
+        if ":" in ln:
+            k, v = ln.split(":", 1)
+            k = k.strip()
+            v = v.strip().rstrip(".")
+            body.append(f"{k}: {v}.")
+        else:
+            body.append(ln if ln.endswith(".") else (ln + "."))
+    para = head
+    if body:
+        para += " " + " ".join(body)
+    return para
+
+def _render_det(text: str, *, bullets: bool, tone: str) -> str:
+    if bullets:
+        return _apply_tone(text, tone)
+    return _apply_tone(_bullets_to_paragraph(text), tone)
+
+# ---------------------------
+# School intent detection (hard stop)
+# ---------------------------
+def is_school_query(question: str) -> bool:
+    ql = question.lower()
+    for canon, aliases in SCHOOL_ALIASES.items():
+        tokens = [canon.lower()] + [a.lower() for a in aliases]
+        if any(tok in ql for tok in tokens):
+            return True
+    # fallback: "... ryu/ryū" pattern
+    if " ryu" in ql or " ryū" in ql:
+        return True
+    return False
+
+# ---------------------------
+# Core RAG pipeline
+# ---------------------------
 def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, Any]], str]:
     # 1) Retrieve
     hits = retrieve(question, k=k)
@@ -381,6 +416,28 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
     hits = inject_leadership_passage_if_needed(question, hits)
     hits = inject_schools_passage_if_needed(question, hits)
     hits = inject_weapons_passage_if_needed(question, hits)
+
+    # 2.5) HARD STOP for school queries — do *only* school profile, or LLM fallback
+    if is_school_query(question):
+        school_fact = None
+        try:
+            school_fact = try_answer_school_profile(
+                question, hits, bullets=(output_style == "Bullets")
+            )
+        except Exception:
+            school_fact = None
+
+        if school_fact:
+            rendered = _render_det(school_fact, bullets=(output_style == "Bullets"), tone=tone_style)
+            return f"🔒 Strict (context-only, explain)\n\n{rendered}", hits, '{"det_path":"schools/profile"}'
+
+        # if profile couldn't render, fall straight to LLM using context (skip generic deterministic to avoid stubs)
+        ctx = build_context(hits)
+        prompt = build_prompt(ctx, question)
+        text, raw = call_llm(prompt)
+        if not text.strip():
+            return "🔒 Strict (context-only)\n\n❌ Model returned no text.", hits, raw or "{}"
+        return f"🔒 Strict (context-only, explain)\n\n{text.strip()}", hits, raw or "{}"
 
     # 3) Leadership short-circuit
     asking_soke = any(t in question.lower() for t in ["soke","sōke","grandmaster","headmaster","current head","current grandmaster"])
@@ -402,34 +459,23 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
     if wr:
         return f"🔒 Strict (context-only)\n\n{wr}", hits, '{"det_path":"weapons/rank"}'
 
-    # 5) Rank requirements (ENTIRE BLOCK) short-circuit
+    # 5) Rank requirements (ENTIRE BLOCK)
     rr = None
     try:
         rr = try_answer_rank_requirements(question, hits)
     except Exception:
         rr = None
     if rr:
-        return f"🔒 Strict (context-only, explain)\n\n{rr}", hits, '{"det_path":"rank/requirements"}'
+        rendered = _render_det(rr, bullets=(output_style == "Bullets"), tone=tone_style)
+        return f"🔒 Strict (context-only, explain)\n\n{rendered}", hits, '{"det_path":"rank/requirements"}'
 
-    # 6) Deterministic extractors (kyusho, kihon happo, sanshin, schools, etc.)
+    # 6) Deterministic dispatcher (kyusho, kihon, sanshin, rank specifics, weapon profile, leadership fallback)
     fact = try_extract_answer(question, hits)
-
-    # 7) School profile deterministic explainer
-    school_fact = None
-    try:
-        school_fact = try_answer_school_profile(question, hits)
-    except Exception:
-        school_fact = None
-
-    if school_fact:
-        # Prefer the deterministic school profile when present
-        return f"🔒 Strict (context-only, explain)\n\n{school_fact}", hits, '{"det_path":"schools/profile"}'
-
     if fact:
-        # Use deterministic fact as final (already concise and grounded)
-        return f"🔒 Strict (context-only, explain)\n\n{fact}", hits, '{"det_path":"deterministic/core"}'
+        rendered = _render_det(fact, bullets=(output_style == "Bullets"), tone=tone_style)
+        return f"🔒 Strict (context-only, explain)\n\n{rendered}", hits, '{"det_path":"deterministic/core"}'
 
-    # 8) LLM fallback with retrieved context
+    # 7) LLM fallback with retrieved context
     ctx = build_context(hits)
     prompt = build_prompt(ctx, question)
     text, raw = call_llm(prompt)
@@ -446,12 +492,17 @@ st.title("🥋 NTTV Chatbot (Local RAG)")
 with st.sidebar:
     st.markdown("### Options")
     show_debug = st.checkbox("Show debugging", value=True)
-    st.caption("Debugging shows retrieved sources and raw model response.")
+
+    st.markdown("### Output")
+    output_style = st.radio("Format", ["Bullets", "Paragraph"], index=0, help="Affects deterministic answers only.")
+    tone_style = st.radio("Tone", ["Crisp", "Chatty"], index=0, help="Affects deterministic answers only.")
+    st.caption("Deterministic answers = school profiles, rank requirements, weapon-rank facts, etc.")
+
     st.markdown("---")
     st.markdown("**Backend**")
     st.caption("Configure MODEL and API base via env vars (OpenAI/OpenRouter/LM Studio).")
 
-q = st.text_input("Ask a question:", value="", placeholder="e.g., what are the rank requirements for 3rd kyu?")
+q = st.text_input("Ask a question:", value="", placeholder="e.g., tell me about gyokko ryu")
 go = st.button("Ask", type="primary")
 
 if go and q.strip():
