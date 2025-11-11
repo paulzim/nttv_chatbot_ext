@@ -1,4 +1,3 @@
-# app.py
 import os
 import json
 import pickle
@@ -24,7 +23,12 @@ from extractors import try_extract_answer
 from extractors.leadership import try_extract_answer as try_leadership
 from extractors.weapons import try_answer_weapon_rank
 from extractors.rank import try_answer_rank_requirements
-from extractors.schools import try_answer_school_profile, SCHOOL_ALIASES
+from extractors.schools import (
+    try_answer_school_profile,
+    try_answer_schools_list,   # list extractor
+    SCHOOL_ALIASES,
+    is_school_list_query,
+)
 
 # ---------------------------
 # Load index & metadata
@@ -145,7 +149,7 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
             qt_boost += 0.55
 
         # Filename heuristic: prefer Weapons Reference / Glossary for weapons Qs
-        fname = os.path.basename(meta.get("source", "")).lower()
+        fname = os.path.basename(meta.get("source") or "").lower()
         if ask_weapon and ("weapons reference" in fname or "glossary" in fname):
             qt_boost += 0.25
 
@@ -163,6 +167,16 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
             qt_boost += 0.60
             if "leadership" in fname:
                 qt_boost += 0.20
+
+        # --- Technique name nudge (from Technique Descriptions)
+        technique_terms = [
+            "omote gyaku","ura gyaku","musha dori","take ori","hon gyaku jime","oni kudaki",
+            "ude garame","ganseki otoshi","juji gatame","omoplata","te hodoki","tai hodoki",
+        ]
+        ask_tech = any(t in q_low for t in technique_terms) or ("what is" in q_low and len(q_low.split()) <= 6)
+        has_tech = any(t in t_low for t in technique_terms) or ("technique descriptions" in fname)
+        if ask_tech and has_tech:
+            qt_boost += 0.55
 
         # Offtopic penalties / lore / length
         offtopic_penalty = 0.0
@@ -310,6 +324,30 @@ def inject_weapons_passage_if_needed(question: str, hits: List[Dict[str, Any]]) 
     }
     return [synth] + hits
 
+def inject_techniques_passage_if_needed(question: str, hits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Prepend the full Technique Descriptions when a technique-style question is asked."""
+    ql = question.lower()
+    triggers = [
+        "what is", "define", "explain",
+        "gyaku", "kudaki", "dori", "gatame", "omoplata",
+        "wrist lock", "shoulder lock", "armbar",
+        "te hodoki", "tai hodoki",
+    ]
+    if not any(t in ql for t in triggers):
+        return hits
+    txt, path = _gather_full_text_for_source("technique descriptions")
+    if not txt:
+        return hits
+    synth = {
+        "text": txt,
+        "meta": {"priority": 1, "source": path or "Technique Descriptions.txt (synthetic)"},
+        "source": path or "Technique Descriptions.txt (synthetic)",
+        "page": None,
+        "score": 1.0,
+        "rerank_score": 994.0,
+    }
+    return [synth] + hits
+
 # ---------------------------
 # LLM backend (fallback)
 # ---------------------------
@@ -358,51 +396,96 @@ def build_prompt(context: str, question: str) -> str:
 # UI helpers for deterministic rendering
 # ---------------------------
 def _apply_tone(text: str, tone: str) -> str:
+    """Light-touch tone adjustments; Chatty adds a friendly closer for non-bullets."""
     if tone == "Chatty":
         if "\n" not in text.strip():
-            return text.strip() + " Hope that helps—want a quick example or drill, too?"
+            return text.strip() + " Want a quick drill or a bit of history too?"
         return text
     return text
 
 def _bullets_to_paragraph(text: str) -> str:
+    """Convert our fielded bullet output into a compact paragraph."""
     lines = [ln.strip() for ln in text.strip().splitlines() if ln.strip()]
     if not lines:
         return text
-    head = lines[0]
-    body = []
+    head = lines[0].rstrip(":")
+    fields = {}
     for ln in lines[1:]:
         if ln.startswith("- "):
             ln = ln[2:]
         if ":" in ln:
             k, v = ln.split(":", 1)
-            k = k.strip()
-            v = v.strip().rstrip(".")
-            body.append(f"{k}: {v}.")
-        else:
-            body.append(ln if ln.endswith(".") else (ln + "."))
-    para = head
-    if body:
-        para += " " + " ".join(body)
-    return para
+            fields[k.strip().lower()] = v.strip().rstrip(".")
+    segs = [head + ":"]
+    if "translation" in fields:
+        segs.append(f'“{fields["translation"]}”.')
+    if "type" in fields:
+        segs.append(f'Type: {fields["type"]}.')
+    if "focus" in fields:
+        segs.append(f'Focus: {fields["focus"]}.')
+    if "weapons" in fields:
+        segs.append(f'Weapons: {fields["weapons"]}.')
+    if "notes" in fields:
+        segs.append(f'Notes: {fields["notes"]}.')
+    return " ".join(segs).strip()
 
 def _render_det(text: str, *, bullets: bool, tone: str) -> str:
+    """
+    Deterministic renderer:
+    - Bullets + Chatty: prepend a synthesized 'Quick take' line from the fields.
+    - Bullets + Crisp: return bullets as-is.
+    - Paragraph modes: convert bullets to paragraph then tone-adjust.
+    """
     if bullets:
-        return _apply_tone(text, tone)
-    return _apply_tone(_bullets_to_paragraph(text), tone)
+        if tone == "Chatty":
+            lines = [ln.strip() for ln in text.strip().splitlines() if ln.strip()]
+            title = lines[0].rstrip(":") if lines else ""
+            fields = {}
+            for ln in lines[1:]:
+                if ln.startswith("- "):
+                    ln = ln[2:]
+                if ":" in ln:
+                    k, v = ln.split(":", 1)
+                    fields[k.strip().lower()] = v.strip()
+            trans = fields.get("translation")
+            typ = fields.get("type")
+            focus = fields.get("focus")
+            quick_bits = []
+            if trans: quick_bits.append(trans)
+            if typ: quick_bits.append(typ)
+            quick = " — ".join(quick_bits) if quick_bits else None
+            if quick and focus:
+                summary = f"Quick take: {quick}; focus on {focus}."
+            elif quick:
+                summary = f"Quick take: {quick}."
+            elif focus:
+                summary = f"Quick take: focus on {focus}."
+            else:
+                summary = None
 
-# ---------------------------
-# School intent detection (hard stop)
-# ---------------------------
+            out = []
+            if summary:
+                out.append(summary)
+            out.append(text.strip())
+            out = "\n".join(out)
+            if not out.strip().endswith("?"):
+                out += "\n\nWant examples, drills, or lineage notes next?"
+            return out
+        else:
+            return text.strip()
+
+    para = _bullets_to_paragraph(text)
+    return _apply_tone(para, tone)
+
+# --- School intent detection ---
 def is_school_query(question: str) -> bool:
     ql = question.lower()
+    # any canonical/alias token OR generic '... ryu'
     for canon, aliases in SCHOOL_ALIASES.items():
         tokens = [canon.lower()] + [a.lower() for a in aliases]
         if any(tok in ql for tok in tokens):
             return True
-    # fallback: "... ryu/ryū" pattern
-    if " ryu" in ql or " ryū" in ql:
-        return True
-    return False
+    return (" ryu" in ql) or (" ryū" in ql)
 
 # ---------------------------
 # Core RAG pipeline
@@ -416,10 +499,28 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
     hits = inject_leadership_passage_if_needed(question, hits)
     hits = inject_schools_passage_if_needed(question, hits)
     hits = inject_weapons_passage_if_needed(question, hits)
+    hits = inject_techniques_passage_if_needed(question, hits)  # NEW
 
-    # 2.5) HARD STOP for school queries — do *only* school profile, or LLM fallback
+    # 2.4) Schools LIST short-circuit (MUST run BEFORE generic deterministic/core)
+    if is_school_list_query(question):
+        list_ans = None
+        try:
+            list_ans = try_answer_schools_list(
+                question, hits, bullets=(output_style == "Bullets")
+            )
+        except Exception:
+            list_ans = None
+
+        if list_ans:
+            rendered = _render_det(list_ans, bullets=(output_style == "Bullets"), tone=tone_style)
+            return (
+                f"🔒 Strict (context-only, explain)\n\n{rendered}",
+                hits,
+                '{"det_path":"schools/list"}'
+            )
+
+    # 2.5) School PROFILE: handle specific ryū queries
     if is_school_query(question):
-        school_fact = None
         try:
             school_fact = try_answer_school_profile(
                 question, hits, bullets=(output_style == "Bullets")
@@ -429,15 +530,27 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
 
         if school_fact:
             rendered = _render_det(school_fact, bullets=(output_style == "Bullets"), tone=tone_style)
-            return f"🔒 Strict (context-only, explain)\n\n{rendered}", hits, '{"det_path":"schools/profile"}'
+            return (
+                f"🔒 Strict (context-only, explain)\n\n{rendered}",
+                hits,
+                '{"det_path":"schools/profile"}'
+            )
 
-        # if profile couldn't render, fall straight to LLM using context (skip generic deterministic to avoid stubs)
+        # Fallback LLM (school context present but no deterministic profile)
         ctx = build_context(hits)
         prompt = build_prompt(ctx, question)
         text, raw = call_llm(prompt)
         if not text.strip():
-            return "🔒 Strict (context-only)\n\n❌ Model returned no text.", hits, raw or "{}"
-        return f"🔒 Strict (context-only, explain)\n\n{text.strip()}", hits, raw or "{}"
+            return (
+                "🔒 Strict (context-only)\n\n❌ Model returned no text.",
+                hits,
+                raw or "{}"
+            )
+        return (
+            f"🔒 Strict (context-only, explain)\n\n{text.strip()}",
+            hits,
+            raw or "{}"
+        )
 
     # 3) Leadership short-circuit
     asking_soke = any(t in question.lower() for t in ["soke","sōke","grandmaster","headmaster","current head","current grandmaster"])
@@ -469,7 +582,7 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
         rendered = _render_det(rr, bullets=(output_style == "Bullets"), tone=tone_style)
         return f"🔒 Strict (context-only, explain)\n\n{rendered}", hits, '{"det_path":"rank/requirements"}'
 
-    # 6) Deterministic dispatcher (kyusho, kihon, sanshin, rank specifics, weapon profile, leadership fallback)
+    # 6) Deterministic dispatcher (techniques, kyusho, kihon, sanshin, rank specifics, weapon profile, leadership fallback)
     fact = try_extract_answer(question, hits)
     if fact:
         rendered = _render_det(fact, bullets=(output_style == "Bullets"), tone=tone_style)
@@ -496,13 +609,13 @@ with st.sidebar:
     st.markdown("### Output")
     output_style = st.radio("Format", ["Bullets", "Paragraph"], index=0, help="Affects deterministic answers only.")
     tone_style = st.radio("Tone", ["Crisp", "Chatty"], index=0, help="Affects deterministic answers only.")
-    st.caption("Deterministic answers = school profiles, rank requirements, weapon-rank facts, etc.")
+    st.caption("Deterministic answers = school profiles, rank requirements, weapon-rank facts, technique definitions, etc.")
 
     st.markdown("---")
     st.markdown("**Backend**")
     st.caption("Configure MODEL and API base via env vars (OpenAI/OpenRouter/LM Studio).")
 
-q = st.text_input("Ask a question:", value="", placeholder="e.g., tell me about gyokko ryu")
+q = st.text_input("Ask a question:", value="", placeholder="e.g., what is omote gyaku")
 go = st.button("Ask", type="primary")
 
 if go and q.strip():
