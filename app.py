@@ -2,6 +2,7 @@ import os
 import json
 import pickle
 from typing import List, Dict, Any, Optional, Tuple
+import re
 
 import numpy as np
 import streamlit as st
@@ -178,6 +179,13 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
         if ask_tech and has_tech:
             qt_boost += 0.55
 
+        # --- Kata-specific boost so kata queries grab the technique table (PATCH)
+        kata_boost = 0.0
+        ask_kata = (" kata" in q_low) or ("no kata" in q_low) or (" kata?" in q_low)
+        has_kata = (" kata" in t_low) or ("no kata" in t_low)
+        if ask_kata and has_kata:
+            kata_boost += 0.50
+
         # Offtopic penalties / lore / length
         offtopic_penalty = 0.0
         if "kihon happo" in q_low and "kyusho" in t_low: offtopic_penalty += 0.15
@@ -201,6 +209,7 @@ def retrieve(q: str, k: int = TOP_K) -> List[Dict[str, Any]]:
                      + keyword_boost
                      + qt_boost
                      + rank_boost
+                     + kata_boost      # <--- include PATCH boost
                      - length_penalty
                      - offtopic_penalty
                      - lore_penalty)
@@ -325,28 +334,112 @@ def inject_weapons_passage_if_needed(question: str, hits: List[Dict[str, Any]]) 
     return [synth] + hits
 
 def inject_techniques_passage_if_needed(question: str, hits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    """Prepend the full Technique Descriptions when a technique-style question is asked."""
+    """Prepend the full Technique Descriptions when a technique-style question is asked (but NOT for concepts)."""
     ql = question.lower()
+
+    # 🚫 Do NOT inject techniques for concept queries (these have their own extractors)
+    if any(b in ql for b in ["kihon happo", "sanshin", "school", "schools", "ryu", "ryū"]):
+        return hits
+
     triggers = [
         "what is", "define", "explain",
-        "gyaku", "kudaki", "dori", "gatame", "omoplata",
+        "gyaku", "kudaki", "dori", "gatame", "ganseki", "nage", "otoshi",
         "wrist lock", "shoulder lock", "armbar",
         "te hodoki", "tai hodoki",
+        " no kata",
     ]
     if not any(t in ql for t in triggers):
         return hits
+
     txt, path = _gather_full_text_for_source("technique descriptions")
     if not txt:
         return hits
+
     synth = {
         "text": txt,
-        "meta": {"priority": 1, "source": path or "Technique Descriptions.txt (synthetic)"},
-        "source": path or "Technique Descriptions.txt (synthetic)",
+        "meta": {"priority": 1, "source": path or "Technique Descriptions.md (synthetic)"},
+        "source": path or "Technique Descriptions.md (synthetic)",
         "page": None,
         "score": 1.0,
         "rerank_score": 994.0,
     }
     return [synth] + hits
+
+def inject_kihon_passage_if_needed(question: str, hits: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """If the question is about Kihon Happo, synthesize a concise passage with the two subsets + items."""
+    ql = question.lower()
+    if "kihon happo" not in ql:
+        return hits
+
+    # harvest relevant lines from existing CHUNKS
+    kosshi_lines, torite_lines, defs = [], [], []
+
+    def push_lines_from(text: str):
+        for raw in text.splitlines():
+            ln = raw.strip()
+            if not ln:
+                continue
+            low = ln.lower()
+            if "kihon happo" in low and 10 < len(ln) < 220:
+                defs.append(ln.rstrip(" ;,"))
+            if "kosshi" in low and "sanpo" in low:
+                # "Kosshi Kihon Sanpo: a, b, c" OR bullets/semicolon lists
+                tail = ln.split(":", 1)[1].strip() if ":" in ln else ln
+                parts = [p.strip(" -•\t") for p in re.split(r"[;,]", tail) if 2 <= len(p.strip()) <= 60]
+                kosshi_lines.extend(parts)
+            if "torite" in low and ("goho" in low or "gohō" in low):
+                tail = ln.split(":", 1)[1].strip() if ":" in ln else ln
+                parts = [p.strip(" -•\t") for p in re.split(r"[;,]", tail) if 2 <= len(p.strip()) <= 60]
+                torite_lines.extend(parts)
+
+    # scan top-N retrieved first, then a light scan across all CHUNKS if needed
+    for p in hits[:8]:
+        push_lines_from(p.get("text", ""))
+
+    if (len(kosshi_lines) < 3 or len(torite_lines) < 5):
+        for c in CHUNKS[:1000]:  # bounded scan
+            src = (c["meta"].get("source") or "").lower()
+            if not any(tag in src for tag in ["training reference", "rank requirements", "schools", "glossary", "technique descriptions"]):
+                continue
+            push_lines_from(c["text"])
+            if len(kosshi_lines) >= 3 and len(torite_lines) >= 5 and defs:
+                break
+
+    # dedupe while preserving order
+    def dedupe(seq):
+        seen = set(); out = []
+        for x in seq:
+            if x and x not in seen:
+                out.append(x); seen.add(x)
+        return out
+
+    kosshi = dedupe(kosshi_lines)[:3]
+    torite = dedupe(torite_lines)[:5]
+
+    if not (kosshi or torite or defs):
+        return hits  # nothing to add
+
+    # build the synthetic passage the kihon extractor loves
+    parts = ["Kihon Happo consists of Kosshi Kihon Sanpo and Torite Goho."]
+    if kosshi:
+        parts.append("Kosshi Kihon Sanpo: " + ", ".join(kosshi) + ".")
+    if torite:
+        parts.append("Torite Goho: " + ", ".join(torite) + ".")
+    if defs:
+        parts.append(defs[0] if parts[-1].endswith(".") else (". " + defs[0]))
+
+    body = " ".join(parts).strip()
+
+    synth = {
+        "text": body,
+        "meta": {"priority": 1, "source": "Kihon Happo (synthetic)"},
+        "source": "Kihon Happo (synthetic)",
+        "page": None,
+        "score": 1.0,
+        "rerank_score": 998.0,
+    }
+    return [synth] + hits
+
 
 # ---------------------------
 # LLM backend (fallback)
@@ -499,7 +592,8 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
     hits = inject_leadership_passage_if_needed(question, hits)
     hits = inject_schools_passage_if_needed(question, hits)
     hits = inject_weapons_passage_if_needed(question, hits)
-    hits = inject_techniques_passage_if_needed(question, hits)  # NEW
+    hits = inject_kihon_passage_if_needed(question, hits)
+    hits = inject_techniques_passage_if_needed(question, hits)
 
     # 2.4) Schools LIST short-circuit (MUST run BEFORE generic deterministic/core)
     if is_school_list_query(question):
@@ -586,7 +680,11 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
     fact = try_extract_answer(question, hits)
     if fact:
         rendered = _render_det(fact, bullets=(output_style == "Bullets"), tone=tone_style)
-        return f"🔒 Strict (context-only, explain)\n\n{rendered}", hits, '{"det_path":"deterministic/core"}'
+        # PATCH: show technique/core tag for kata-like questions; else generic deterministic/core
+        ql = question.lower()
+        looks_like_kata = (" kata" in ql) or ("no kata" in ql) or re.search(r"\bexplain\s+.+\s+no\s+kata\b", ql)
+        det_tag = '{"det_path":"technique/core"}' if looks_like_kata else '{"det_path":"deterministic/core"}'
+        return f"🔒 Strict (context-only, explain)\n\n{rendered}", hits, det_tag
 
     # 7) LLM fallback with retrieved context
     ctx = build_context(hits)

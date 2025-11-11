@@ -1,99 +1,65 @@
+# extractors/__init__.py
 from typing import List, Dict, Any, Optional
 
-# -------------------------------
-# Rank-specific extractors (run first after technique)
-# -------------------------------
+# ----- Rank-specific extractors (most precise; run first)
 from .rank import (
-    try_answer_rank_requirements,  # whole-rank block slicer (e.g., "requirements for 3rd kyu")
-    try_answer_rank_striking,      # kicks/punches for a given kyu
-    try_answer_rank_nage,          # throws for a given kyu
-    try_answer_rank_jime,          # chokes for a given kyu
-    try_answer_rank_weapons,       # optional: weapons per-rank if implemented
+    try_answer_rank_striking,
+    try_answer_rank_nage,
+    try_answer_rank_jime,
+    try_answer_rank_requirements,   # explicit “requirements for X kyu”
 )
 
-# -------------------------------
-# Weapons extractors (non-rank & rank-intro)
-# -------------------------------
-# Some repos may not have both; import defensively.
+# If you implemented rank weapons in rank.py, import it; otherwise comment it out.
 try:
-    from .weapons import (
-        try_answer_weapon_profile,  # e.g., "what is a kusari fundo?"
-        try_answer_weapon_rank,     # e.g., "at what rank do I learn kusari fundo?"
-    )
-    _HAS_WEAPON_RANK = True
+    from .rank import try_answer_rank_weapons  # optional
 except Exception:
-    try:
-        from .weapons import try_answer_weapon_profile
-        _HAS_WEAPON_RANK = False
-    except Exception:
-        # Weapons not present
-        try_answer_weapon_profile = None  # type: ignore
-        _HAS_WEAPON_RANK = False
+    def try_answer_rank_weapons(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
+        return None
 
-# -------------------------------
-# Technique extractor (deterministic definitions)
-# -------------------------------
-try:
-    from .techniques import try_answer_technique  # e.g., "what is omote gyaku"
-    _HAS_TECHNIQUES = True
-except Exception:
-    try_answer_technique = None  # type: ignore
-    _HAS_TECHNIQUES = False
-
-# -------------------------------
-# Concept extractors (context-only)
-# -------------------------------
+# ----- Deterministic concept/technique extractors
 from .kyusho import try_answer_kyusho
+from .techniques import try_answer_technique
 from .kihon_happo import try_answer_kihon_happo
 from .sanshin import try_answer_sanshin
 
-# NOTE: School list/profile logic is routed in app.py
-# (We call the dedicated schools extractors from there to honor UI toggles.)
+# NOTE: Schools are handled *directly in app.py*:
+#   - try_answer_school_profile
+#   - try_answer_schools_list
+#   - is_school_list_query
+# So we do not import any school extractor here to avoid symbol drift.
 
-# -------------------------------
-# Leadership (sōke/lineage)
-# -------------------------------
+# Leadership (sokeship mapping, discrete facts)
 from .leadership import try_extract_answer as try_leadership
 
 
-# ===============================
-# Master dispatcher (deterministic, context-only)
-# ===============================
 def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
     """
-    Deterministic, context-only answers for high-signal queries.
-    Returns a short string/bulleted block or None to fall back to the LLM.
-    Ordering matters.
+    Deterministic, context-only answers for high-signal intents.
+    Return a short string (bullets or brief paragraph) or None to fall back to the LLM.
+    Order matters: most specific first.
     """
 
-    # ---- Technique definitions (e.g., "what is omote gyaku")
-    if _HAS_TECHNIQUES and try_answer_technique:
-        try:
-            ans = try_answer_technique(question, passages)
-            if ans:
-                return ans
-        except Exception:
-            pass
-
-    # ---- Rank: whole-block requirements (most specific)
-    ans = try_answer_rank_requirements(question, passages)
-    if ans:
-        return ans
-
-    # ---- Rank: striking / throws / chokes
+    # --- Rank-specific: Striking (kicks/punches)
     ans = try_answer_rank_striking(question, passages)
     if ans:
         return ans
 
+    # --- Rank-specific: Throws (Nage waza)
     ans = try_answer_rank_nage(question, passages)
     if ans:
         return ans
 
+    # --- Rank-specific: Chokes (Jime waza)
     ans = try_answer_rank_jime(question, passages)
     if ans:
         return ans
 
-    # ---- Rank: weapons (optional)
+    # --- Rank-specific: Requirements (ENTIRE block for an explicit “requirements for X kyu” q)
+    ans = try_answer_rank_requirements(question, passages)
+    if ans:
+        return ans
+
+    # --- Rank-specific: Weapons by rank (optional)
     try:
         ans = try_answer_rank_weapons(question, passages)
         if ans:
@@ -101,24 +67,7 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optiona
     except Exception:
         pass
 
-    # ---- Weapons: rank-intro (optional) then profile
-    if _HAS_WEAPON_RANK:
-        try:
-            ans = try_answer_weapon_rank(question, passages)  # e.g., "at what rank do I learn X?"
-            if ans:
-                return ans
-        except Exception:
-            pass
-
-    if try_answer_weapon_profile:
-        try:
-            ans = try_answer_weapon_profile(question, passages)  # e.g., "what is X?"
-            if ans:
-                return ans
-        except Exception:
-            pass
-
-    # ---- Concepts: kyusho / kihon happo / sanshin
+    # --- Concept: Kyusho (short, deterministic)
     try:
         ans = try_answer_kyusho(question, passages)
         if ans:
@@ -126,6 +75,15 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optiona
     except Exception:
         pass
 
+    # --- Techniques (e.g., Omote Gyaku, Musha Dori, Jumonji no Kata, etc.)
+    try:
+        ans = try_answer_technique(question, passages)
+        if ans:
+            return ans
+    except Exception:
+        pass
+
+    # --- Concept: Kihon Happo
     try:
         ans = try_answer_kihon_happo(question, passages)
         if ans:
@@ -133,6 +91,7 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optiona
     except Exception:
         pass
 
+    # --- Concept: Sanshin
     try:
         ans = try_answer_sanshin(question, passages)
         if ans:
@@ -140,7 +99,7 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optiona
     except Exception:
         pass
 
-    # ---- Leadership (soke & current heads)
+    # --- Leadership (Soke / headmaster lookups)
     try:
         ans = try_leadership(question, passages)
         if ans:
@@ -148,5 +107,5 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optiona
     except Exception:
         pass
 
-    # No deterministic hit → let app.py route schools or fall back to LLM
+    # Schools are handled in app.py BEFORE this dispatcher.
     return None
