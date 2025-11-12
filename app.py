@@ -20,6 +20,7 @@ except Exception:
     SentenceTransformer = None
 
 # Deterministic extractors (dispatcher + specific modules)
+from extractors.kihon_happo import try_answer_kihon_happo
 from extractors import try_extract_answer
 from extractors.leadership import try_extract_answer as try_leadership
 from extractors.weapons import try_answer_weapon_rank
@@ -595,16 +596,14 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
     hits = inject_kihon_passage_if_needed(question, hits)
     hits = inject_techniques_passage_if_needed(question, hits)
 
-    # 2.4) Schools LIST short-circuit (MUST run BEFORE generic deterministic/core)
+    # 2.4) Schools LIST short-circuit
     if is_school_list_query(question):
-        list_ans = None
         try:
             list_ans = try_answer_schools_list(
                 question, hits, bullets=(output_style == "Bullets")
             )
         except Exception:
             list_ans = None
-
         if list_ans:
             rendered = _render_det(list_ans, bullets=(output_style == "Bullets"), tone=tone_style)
             return (
@@ -613,7 +612,7 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
                 '{"det_path":"schools/list"}'
             )
 
-    # 2.5) School PROFILE: handle specific ryū queries
+    # 2.5) School PROFILE short-circuit
     if is_school_query(question):
         try:
             school_fact = try_answer_school_profile(
@@ -621,7 +620,6 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
             )
         except Exception:
             school_fact = None
-
         if school_fact:
             rendered = _render_det(school_fact, bullets=(output_style == "Bullets"), tone=tone_style)
             return (
@@ -630,26 +628,17 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
                 '{"det_path":"schools/profile"}'
             )
 
-        # Fallback LLM (school context present but no deterministic profile)
+        # fallback LLM for schools
         ctx = build_context(hits)
         prompt = build_prompt(ctx, question)
         text, raw = call_llm(prompt)
         if not text.strip():
-            return (
-                "🔒 Strict (context-only)\n\n❌ Model returned no text.",
-                hits,
-                raw or "{}"
-            )
-        return (
-            f"🔒 Strict (context-only, explain)\n\n{text.strip()}",
-            hits,
-            raw or "{}"
-        )
+            return "🔒 Strict (context-only)\n\n❌ Model returned no text.", hits, raw or "{}"
+        return f"🔒 Strict (context-only, explain)\n\n{text.strip()}", hits, raw or "{}"
 
     # 3) Leadership short-circuit
     asking_soke = any(t in question.lower() for t in ["soke","sōke","grandmaster","headmaster","current head","current grandmaster"])
     if asking_soke:
-        fact = None
         try:
             fact = try_leadership(question, hits)
         except Exception:
@@ -657,8 +646,7 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
         if fact:
             return f"🔒 Strict (context-only, explain)\n\n{fact}", hits, '{"det_path":"leadership/soke"}'
 
-    # 4) Weapon rank short-circuit (single factual line)
-    wr = None
+    # 4) Weapon rank short-circuit
     try:
         wr = try_answer_weapon_rank(question, hits)
     except Exception:
@@ -666,8 +654,7 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
     if wr:
         return f"🔒 Strict (context-only)\n\n{wr}", hits, '{"det_path":"weapons/rank"}'
 
-    # 5) Rank requirements (ENTIRE BLOCK)
-    rr = None
+    # 5) Rank requirements short-circuit (ENTIRE block)
     try:
         rr = try_answer_rank_requirements(question, hits)
     except Exception:
@@ -676,11 +663,18 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
         rendered = _render_det(rr, bullets=(output_style == "Bullets"), tone=tone_style)
         return f"🔒 Strict (context-only, explain)\n\n{rendered}", hits, '{"det_path":"rank/requirements"}'
 
-    # 6) Deterministic dispatcher (techniques, kyusho, kihon, sanshin, rank specifics, weapon profile, leadership fallback)
+    # 5.5) Kihon Happo hard short-circuit (MUST run BEFORE generic dispatcher)
+    q_low = (question or "").lower()
+    if "kihon happo" in q_low or "kihon happō" in q_low:
+        kihon_ans = try_answer_kihon_happo(question, hits)
+        if kihon_ans:
+            rendered = _render_det(kihon_ans, bullets=(output_style == "Bullets"), tone=tone_style)
+            return f"🔒 Strict (context-only, explain)\n\n{rendered}", hits, '{"det_path":"deterministic/kihon"}'
+
+    # 6) Deterministic dispatcher (techniques, kyusho, kihon via dispatcher, sanshin, etc.)
     fact = try_extract_answer(question, hits)
     if fact:
         rendered = _render_det(fact, bullets=(output_style == "Bullets"), tone=tone_style)
-        # PATCH: show technique/core tag for kata-like questions; else generic deterministic/core
         ql = question.lower()
         looks_like_kata = (" kata" in ql) or ("no kata" in ql) or re.search(r"\bexplain\s+.+\s+no\s+kata\b", ql)
         det_tag = '{"det_path":"technique/core"}' if looks_like_kata else '{"det_path":"deterministic/core"}'
@@ -693,6 +687,7 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
     if not text.strip():
         return "🔒 Strict (context-only)\n\n❌ Model returned no text.", hits, raw or "{}"
     return f"🔒 Strict (context-only, explain)\n\n{text.strip()}", hits, raw or "{}"
+
 
 # ---------------------------
 # UI
