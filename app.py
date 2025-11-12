@@ -32,6 +32,11 @@ from extractors.schools import (
     is_school_list_query,
 )
 
+from extractors.technique_match import (
+    is_single_technique_query as _is_single_technique_query,
+    technique_name_variants as _tech_name_variants,
+)
+
 # ---------------------------
 # Load index & metadata
 # ---------------------------
@@ -441,9 +446,132 @@ def inject_kihon_passage_if_needed(question: str, hits: List[Dict[str, Any]]) ->
     }
     return [synth] + hits
 
+# --- Single-technique CSV fast-path (parsing & render) ------------------------
+def _parse_tech_csv_line(line: str) -> Optional[Dict[str, str]]:
+    """
+    Parse a single technique CSV row from Technique Descriptions.md.
+
+    Expected logical columns (min 12):
+      0 name
+      1 japanese
+      2 english
+      3 family (e.g., 'Kihon Happo - Kosshi')
+      4 rank_intro (e.g., '7th Kyu')
+      5 approved (✅/False/True)
+      6 focus
+      7 safety
+      8 partner_required (True/False)
+      9 solo (True/False)
+      10 tags (pipe-separated)
+      11+ definition (may include commas)
+
+    Returns a dict or None if we can't parse.
+    """
+    if not line or "," not in line:
+        return None
+    # split once for the first 11 fields; the rest join into definition
+    parts = [p.strip() for p in line.split(",")]
+    if len(parts) < 12:
+        return None
+    head = parts[:11]
+    definition = ",".join(parts[11:]).strip()  # keep commas in definition
+
+    name = head[0]
+    japanese = head[1]
+    english = head[2]
+    family = head[3]
+    rank_intro = head[4]
+    approved = head[5]
+    focus = head[6]
+    safety = head[7]
+    partner_required = head[8]
+    solo = head[9]
+    tags = head[10]
+
+    return {
+        "name": name,
+        "japanese": japanese,
+        "english": english,
+        "family": family,
+        "rank_intro": rank_intro,
+        "approved": approved,
+        "focus": focus,
+        "safety": safety,
+        "partner_required": partner_required,
+        "solo": solo,
+        "tags": tags,
+        "definition": definition,
+    }
+
+def _render_single_technique(row: Dict[str, str], *, bullets: bool, tone: str, detail_mode: str) -> str:
+    """
+    Format a single technique into bullets or paragraph. 'detail_mode' in {"Brief","Standard","Full"}.
+    """
+    title  = row.get("name","Technique")
+    jp     = row.get("japanese","")
+    en     = row.get("english","")
+    family = row.get("family","")
+    rank   = row.get("rank_intro","")
+    focus  = row.get("focus","")
+    safety = row.get("safety","")
+    part   = row.get("partner_required","")
+    solo   = row.get("solo","")
+    tags   = row.get("tags","")
+    defin  = (row.get("definition") or "").strip()
+
+    if detail_mode == "Brief":
+        brief = [f"{title}:"]
+        if en:  brief.append(f"- English: {en}")
+        if jp:  brief.append(f"- Japanese: {jp}")
+        if defin: brief.append(f"- Definition: {defin if defin.endswith('.') else defin + '.'}")
+        body = "\n".join(brief)
+
+    elif detail_mode == "Standard":
+        std = [f"{title}:"]
+        if en:      std.append(f"- English: {en}")
+        if jp:      std.append(f"- Japanese: {jp}")
+        if family:  std.append(f"- Family: {family}")
+        if rank:    std.append(f"- Rank intro: {rank}")
+        if focus:   std.append(f"- Focus: {focus}")
+        if defin:   std.append(f"- Definition: {defin if defin.endswith('.') else defin + '.'}")
+        body = "\n".join(std)
+
+    else:  # Full
+        full = [f"{title}:"]
+        if jp:      full.append(f"- Japanese: {jp}")
+        if en:      full.append(f"- English: {en}")
+        if family:  full.append(f"- Family: {family}")
+        if rank:    full.append(f"- Rank intro: {rank}")
+        if focus:   full.append(f"- Focus: {focus}")
+        if safety:  full.append(f"- Safety: {safety}")
+        if part:    full.append(f"- Partner required: {part}")
+        if solo:    full.append(f"- Solo: {solo}")
+        if tags:    full.append(f"- Tags: {tags}")
+        if defin:   full.append(f"- Definition: {defin if defin.endswith('.') else defin + '.'}")
+        body = "\n".join(full)
+
+    return _render_det(body, bullets=bullets, tone=tone)
+
+def answer_single_technique_if_synthetic(passages: List[Dict[str, Any]], *, bullets: bool, tone: str, detail_mode: str) -> Optional[str]:
+    """
+    If the first passage is our synthetic single-technique CSV line, parse & render it now.
+    """
+    if not passages:
+        return None
+    top = passages[0]
+    src = (top.get("source") or "").lower()
+    if "technique descriptions (synthetic line)" not in src:
+        return None
+    line = (top.get("text") or "").strip()
+    row = _parse_tech_csv_line(line)
+    if not row:
+        return None
+    return _render_single_technique(row, bullets=bullets, tone=tone, detail_mode=detail_mode)
+
+
 # --- Technique CSV line injector (for single-technique queries) ----------------
 import unicodedata
-import re
+import re as _re2  # avoid shadowing
 
 def _fold(s: str) -> str:
     if not s:
@@ -462,10 +590,10 @@ def _is_single_technique_query(q: str) -> Optional[str]:
     for ban in ("kihon happo", "kihon happō", "sanshin", "school", "schools", "ryu", "ryū"):
         if ban in ql:
             return None
-    m = re.search(r"(?:what\s+is|define|explain)\s+(.+)$", q, flags=re.I)
+    m = _re2.search(r"(?:what\s+is|define|explain)\s+(.+)$", q, flags=_re2.I)
     cand = (m.group(1) if m else q).strip().rstrip("?!.")
     # trim generic suffixes
-    cand = re.sub(r"\b(technique|in ninjutsu|in bujinkan)\b", "", cand, flags=re.I).strip()
+    cand = _re2.sub(r"\b(technique|in ninjutsu|in bujinkan)\b", "", cand, flags=_re2.I).strip()
     return cand if 2 <= len(cand) <= 80 else None
 
 def _tech_name_variants(name: str) -> list[str]:
@@ -514,16 +642,12 @@ def _find_tech_line_in_chunks(name_variants: list[str]) -> Optional[str]:
     return None
 
 def inject_specific_technique_line_if_needed(question: str, passages: list[dict]) -> list[dict]:
-    """
-    If user asks for a single technique, look up the exact CSV line in the entire
-    Technique Descriptions.md (across all chunks) and prepend a synthetic passage.
-    """
     cand = _is_single_technique_query(question)
     if not cand:
         return passages
 
     variants = _tech_name_variants(cand)
-    line = _find_tech_line_in_chunks(variants)
+    line = _find_tech_line_in_chunks(variants)  # keep your existing scanner
     if not line:
         return passages
 
@@ -535,7 +659,6 @@ def inject_specific_technique_line_if_needed(question: str, passages: list[dict]
         "score": 1.0,
         "rerank_score": 1.0,
     }
-    # avoid duplicating if already present at top
     if not passages or passages[0].get("text") != line:
         return [synth] + passages
     return passages
@@ -696,6 +819,15 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
     hits = inject_techniques_passage_if_needed(question, hits)
     hits = inject_specific_technique_line_if_needed(question, hits)
 
+    # Fast-path: if we injected a single technique CSV line, answer immediately
+    fast = answer_single_technique_if_synthetic(
+        hits,
+        bullets=(output_style == "Bullets"),
+        tone=tone_style,
+        detail_mode=TECH_DETAIL_MODE,
+    )
+    if fast:
+        return f"🔒 Strict (context-only, explain)\n\n{fast}", hits, '{"det_path":"technique/single"}'
 
     # 2.4) Schools LIST short-circuit
     if is_school_list_query(question):
@@ -804,6 +936,14 @@ with st.sidebar:
     output_style = st.radio("Format", ["Bullets", "Paragraph"], index=0, help="Affects deterministic answers only.")
     tone_style = st.radio("Tone", ["Crisp", "Chatty"], index=0, help="Affects deterministic answers only.")
     st.caption("Deterministic answers = school profiles, rank requirements, weapon-rank facts, technique definitions, etc.")
+
+    # --- Technique detail level toggle (NEW) ---
+    TECH_DETAIL_MODE = st.selectbox(
+        "Technique detail",
+        options=["Brief", "Standard", "Full"],
+        index=1,  # default Standard
+        help="How much detail to show for single-technique answers."
+    )
 
     st.markdown("---")
     st.markdown("**Backend**")
