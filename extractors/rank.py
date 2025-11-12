@@ -1,397 +1,391 @@
 # extractors/rank.py
-import re
+from __future__ import annotations
 from typing import List, Dict, Any, Optional
-from .common import dedupe_preserve
+import re
 
-# ---------- shared helpers ----------
-# Accepts: "8th kyu", "8 kyu", and "kyu 8"
-_ORD_RE = re.compile(r"\b(\d{1,2})(?:st|nd|rd|th)?\s+kyu\b", re.I)
-_REV_RE = re.compile(r"\bkyu\s*(\d{1,2})(?:st|nd|rd|th)?\b", re.I)
+# ============================================================
+# Small, safe helpers (keep behavior stable)
+# ============================================================
 
-def _parse_rank_label(q: str) -> Optional[str]:
-    ql = q.lower()
-    m = _ORD_RE.search(ql) or _REV_RE.search(ql)
-    if not m:
-        return None
-    num = m.group(1)
-    # canonical ordinal suffix
-    suf = "th"
-    if not num.endswith(("11", "12", "13")):
-        if num.endswith("1"):
-            suf = "st"
-        elif num.endswith("2"):
-            suf = "nd"
-        elif num.endswith("3"):
-            suf = "rd"
-    return f"{num}{suf} Kyu"
+def _norm(s: str) -> str:
+    return re.sub(r"\s+", " ", (s or "")).strip()
 
-def _split_lines(s: str) -> List[str]:
-    return s.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+def _lc(s: str) -> str:
+    return _norm(s).lower()
 
-def _is_rank_header(line: str) -> bool:
-    l = line.strip().lower()
-    return bool(
-        _ORD_RE.search(l) or
-        re.search(r"\bkyu\s*:\s*\d{1,2}(?:st|nd|rd|th)?\s+kyu\b", l)
-    )
+def _join_human(items: List[str]) -> str:
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    return ", ".join(items[:-1]) + f", {items[-1]}"
 
-def _find_rank_block(full_text: str, rank_label: str) -> Optional[str]:
-    """
-    Line-based: find the first line that mentions the rank, then collect lines
-    until the next rank header or EOF.
-    """
-    lines = _split_lines(full_text)
-    start_idx = None
-    pat = re.compile(rf"(?i)\b{re.escape(rank_label)}\b|kyu\s*:\s*{re.escape(rank_label)}\b")
-    for i, ln in enumerate(lines):
-        if pat.search(ln):
-            start_idx = i
-            break
-    if start_idx is None:
-        return None
+def _dedup(seq: List[str]) -> List[str]:
+    seen, out = set(), []
+    for s in seq:
+        s_n = _norm(s)
+        k = s_n.lower()
+        if s_n and k not in seen:
+            out.append(s_n)
+            seen.add(k)
+    return out
 
-    out = [lines[start_idx]]
-    for ln in lines[start_idx + 1:]:
-        if _is_rank_header(ln):
-            break
-        out.append(ln)
-    return "\n".join(out).strip()
+# ============================================================
+# Alias tables for nicer display (kicks + punches)
+# ============================================================
 
-def _split_items(s: str) -> List[str]:
-    """Split tolerant to commas/semicolons/slashes/newlines/bullets/pipes/“and”."""
-    if not s:
-        return []
-    s = re.sub(r"\band\b", ",", s, flags=re.I)
-    s = s.replace("•", ",").replace("・", ",").replace("|", ",")
-    parts = re.split(r"[,\n;\/]+", s)
-    out = []
-    for p in parts:
-        t = p.strip().strip("-–—").strip()
-        if not t:
-            continue
-        t = re.sub(r"^\((.*)\)$", r"\1", t).strip()
-        t = re.sub(r"\s+", " ", t)
-        out.append(t)
-    return dedupe_preserve(out)
+_KICK_ALIASES: Dict[str, List[str]] = {
+    "zenpo geri": ["Mae Geri", "Front Kick"],
+    "mae geri": ["Zenpo Geri", "Front Kick"],
+    "front kick": ["Zenpo Geri", "Mae Geri"],
+    "sokuho geri": ["Side Kick"],
+    "koho geri": ["Back Kick"],
+}
 
-def _pick_rank_passages(passages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    rp = [p for p in passages if "rank requirements" in (p.get("source") or "").lower()]
-    return rp if rp else passages
+_PUNCH_ALIASES: Dict[str, List[str]] = {
+    "fudo ken": ["Immovable Fist"],
+    "shuto": ["Knife-hand"],
+    "shuto uchi": ["Knife-hand Strike"],
+    "shikan ken": ["Foreknuckle Fist"],
+    "shako ken": ["Claw Hand"],
+    "boshi ken": ["Thumb Knuckle Strike"],
+    "tsuki": ["Punch"],
+    "jodan tsuki": ["High Punch"],
+    "gedan tsuki": ["Low Punch"],
+    "ken kudaki": ["Fist Crusher"],
+    "happa ken": ["Double-Palm Strike"],
+    "kikaku ken": ["Headbutt"],
+}
 
-def _collect_fields(rank_block: str) -> Dict[str, List[str]]:
-    data: Dict[str, List[str]] = {}
-    if not rank_block:
-        return data
-    lines = rank_block.splitlines()
-    i = 0
-    while i < len(lines):
-        ln = lines[i]
-        m = _FIELD_RX.match(ln)
-        if m:
-            field = m.group(1).lower()
-            val = m.group(2)
-            j = i + 1
-            cont: List[str] = []
-            while j < len(lines):
-                nxt = lines[j]
-                if not nxt.strip() or _FIELD_RX.match(nxt):
-                    break
-                cont.append(nxt.strip())
-                j += 1
-            if cont:
-                val = val + " " + " ".join(cont)
-            items = [x for x in _split_items(val) if x]  # <-- filter empties
-            if items:                                    # <-- skip empty fields
-                data[field] = items
-            i = j
-            continue
-        i += 1
-    return data
+def _with_kick_aliases(name: str) -> str:
+    key = _lc(name)
+    aliases = _KICK_ALIASES.get(key, [])
+    if not aliases:
+        return _norm(name)
+    seen = {_norm(name)}
+    alias_clean = []
+    for a in aliases:
+        a_n = _norm(a)
+        if a_n not in seen:
+            alias_clean.append(a_n)
+            seen.add(a_n)
+    return f"{_norm(name)} ({' / '.join(alias_clean)})" if alias_clean else _norm(name)
 
+def _with_punch_aliases(name: str) -> str:
+    key = _lc(name)
+    aliases = _PUNCH_ALIASES.get(key, [])
+    if not aliases:
+        return _norm(name)
+    seen = {_norm(name)}
+    alias_clean = []
+    for a in aliases:
+        a_n = _norm(a)
+        if a_n not in seen:
+            alias_clean.append(a_n)
+            seen.add(a_n)
+    return f"{_norm(name)} ({' / '.join(alias_clean)})" if alias_clean else _norm(name)
 
-def _render_rank_summary(rank_label: str, fields: Dict[str, List[str]]) -> Optional[str]:
-    if not fields:
-        return None
-    order = [
-        "weapon", "weapon kamae", "weapon strikes", "cuts", "draws", "evasions", "weapon spinning",
-        "kamae", "ukemi", "kaiten", "taihenjutsu", "blocking", "striking",
-        "grappling and escapes", "kihon happo", "san shin no kata",
-        "nage waza", "jime waza", "kyusho", "other"
-    ]
-    lines = [f"{rank_label.title()} — key requirements:"]
-    for f in order:
-        if f in fields and fields[f]:
-            pretty = f.title().replace("And Escapes", "& Escapes")
-            pretty = pretty.replace("San Shin No Kata", "Sanshin no Kata")
-            vals = "; ".join(fields[f])
-            lines.append(f"- {pretty}: {vals}")
-    return "\n".join(lines)
+# ============================================================
+# Rank parsing
+# ============================================================
 
-# Relaxed intent to catch “what do I learn at 3rd kyu (weapons)”
-_WEAPON_INTENT = re.compile(
-    r"\b(weapon|weapons|buki|sword|katana|tanto|bokken|bo|hanbo|staff|stick|yari|naginata|shuriken|"
-    r"kusari(?:\s*fundo)?|rope|shoge|kyoketsu(?:\s*shoge)?)\b"
-    r"|what\s+weapons|weapons\s+at\s+\d+(?:st|nd|rd|th)?\s+kyu",
-    re.I
+_RANK_HEADER_RE = re.compile(
+    r"^(?P<hdr>(?:\d+(?:st|nd|rd|th)\s+kyu|shodan))\b",
+    re.IGNORECASE | re.MULTILINE
 )
 
-
-# ---------- Rank REQUIREMENTS (entire block slicer) ----------
-_FIELD_HEADS = [
-    "weapon", "weapon kamae", "weapon strikes", "cuts", "draws", "evasions", "weapon spinning",
-    "kamae", "ukemi", "kaiten", "taihenjutsu", "tai sabaki", "blocking", "striking",
-    "grappling and escapes", "kihon happo", "san shin no kata", "nage waza", "jime waza",
-    "kyusho", "other"
-]
-_FIELD_RX = re.compile(r"(?im)^\s*(" + "|".join(re.escape(h) for h in _FIELD_HEADS) + r")\s*:\s*(.*)$")
-
-def _collect_fields(rank_block: str) -> Dict[str, List[str]]:
-    """Parse 'Field: a; b; c' lines into dict of lists, with continuation lines."""
-    data: Dict[str, List[str]] = {}
-    if not rank_block:
-        return data
-    lines = rank_block.splitlines()
-    i = 0
-    while i < len(lines):
-        ln = lines[i]
-        m = _FIELD_RX.match(ln)
-        if m:
-            field = m.group(1).lower()
-            val = m.group(2)
-            # collect continuation lines until blank or next field
-            j = i + 1
-            cont: List[str] = []
-            while j < len(lines):
-                nxt = lines[j]
-                if not nxt.strip():
-                    break
-                if _FIELD_RX.match(nxt):
-                    break
-                cont.append(nxt.strip())
-                j += 1
-            if cont:
-                val = val + " " + " ".join(cont)
-            items = _split_items(val)
-            data[field] = items
-            i = j
-            continue
-        i += 1
-    return data
-
-def _render_rank_summary(rank_label: str, fields: Dict[str, List[str]]) -> Optional[str]:
-    if not fields:
-        return None
-    order = [
-        "weapon", "weapon kamae", "weapon strikes", "cuts", "draws", "evasions", "weapon spinning",
-        "kamae", "ukemi", "kaiten", "taihenjutsu", "blocking", "striking",
-        "grappling and escapes", "kihon happo", "san shin no kata",
-        "nage waza", "jime waza", "kyusho", "other"
-    ]
-    lines = [f"{rank_label.title()} — key requirements:"]
-    for f in order:
-        if f in fields and fields[f]:
-            pretty = f.title().replace("And Escapes", "& Escapes").replace("San Shin No Kata", "Sanshin no Kata")
-            vals = "; ".join(fields[f])
-            lines.append(f"- {pretty}: {vals}")
-    return "\n".join(lines)
-
-def try_answer_rank_requirements(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
-    """Return ONLY the requested rank’s requirements, neatly summarized."""
-    rank_label = _parse_rank_label(question)
-    if not rank_label:
-        # allow trigger phrase “rank requirements” without a clear numeral → let other paths handle
-        if "rank requirement" not in question.lower():
-            return None
-        return None
-
-    rank_passages = _pick_rank_passages(passages)
-    full_text = "\n\n".join(p["text"] for p in rank_passages)
-    block = _find_rank_block(full_text, rank_label)
-    if not block:
-        return None
-
-    fields = _collect_fields(block)
-    summary = _render_rank_summary(rank_label, fields)
-    return summary
-
-# ---------- STRIKING (kicks/punches) ----------
-_STRIKE_HEAD_RE = re.compile(r"(?i)^\s*striking(?:\s+\w+){0,3}\s*(?::|[-–—])?\s*(.*)$")
-
-def _extract_striking_line(block_text: str) -> Optional[str]:
-    for ln in _split_lines(block_text):
-        m = _STRIKE_HEAD_RE.match(ln)
-        if m:
-            rest = m.group(1).strip()
-            if rest:
-                return rest
+def _rank_key_from_question(q: str) -> Optional[str]:
+    ql = _lc(q)
+    m = re.search(r"\b(\d+)\s*(?:st|nd|rd|th)?\s*kyu\b", ql)
+    if m:
+        n = m.group(1)
+        if n == "1":
+            return "1st kyu"
+        if n == "2":
+            return "2nd kyu"
+        if n == "3":
+            return "3rd kyu"
+        return f"{n}th kyu"
+    if "shodan" in ql:
+        return "shodan"
     return None
 
-def _is_kick(x: str) -> bool:
-    lx = x.lower().strip()
-    WHITELIST = {"zenpo geri", "sokuho geri", "koho geri", "sakui geri", "happo geri"}
-    return ("geri" in lx) or (" kick" in lx) or lx.endswith("kick") or lx in WHITELIST
+def _find_rank_text_from_passages(passages: List[Dict[str, Any]]) -> Optional[str]:
+    # Prefer explicitly injected rank requirements
+    for p in passages:
+        src = (p.get("source") or p.get("meta", {}).get("source") or "").lower()
+        text = p.get("text", "")
+        if text and "nttv rank requirements" in src:
+            return text
+    # Fallback: any chunk that clearly looks like a rank document
+    for p in passages:
+        text = (p.get("text") or "")
+        if text and ("kyu" in text.lower() and "kamae" in text.lower()):
+            return text
+    return None
 
-def _is_punch(x: str) -> bool:
-    lx = x.lower()
-    return ("tsuki" in lx) or lx.endswith(" ken") or (" ken " in lx) or ("uraken" in lx)
+def _extract_rank_block(full_text: str, rank_key: str) -> Optional[str]:
+    if not full_text or not rank_key:
+        return None
+    pattern = re.compile(rf"^(?P<hdr>{re.escape(rank_key)})\b.*$", re.IGNORECASE | re.MULTILINE)
+    start_m = pattern.search(full_text)
+    if not start_m:
+        return None
+    start = start_m.start()
+    next_m = _RANK_HEADER_RE.search(full_text, pos=start + 1)
+    end = next_m.start() if next_m else len(full_text)
+    return full_text[start:end].strip()
 
-_KICK_INTENT   = re.compile(r"\b(kick|kicks|geri|geris)\b", re.I)
-_PUNCH_INTENT  = re.compile(r"\b(punch|punches|tsuki|tsukis)\b|\b(?:^|[\s\-])ken\b", re.I)
-_STRIKE_INTENT = re.compile(r"\b(strike|strikes|striking)\b", re.I)
+def _extract_section_lines(block: str, header_label: str) -> List[str]:
+    """
+    Get lines for a header like "Striking:".
+    IMPORTANT FIX: capture items that appear on the SAME LINE as the header,
+    e.g., "Striking: Fudo Ken; ...".
+    """
+    if not block:
+        return []
+
+    # Find the header line and capture optional inline content after ':' on that same line
+    hdr_line_re = re.compile(
+        rf"^(?P<header>\s*{re.escape(header_label)})\s*(?P<inline>.*)$",
+        re.IGNORECASE | re.MULTILINE
+    )
+    m = hdr_line_re.search(block)
+    if not m:
+        return []
+
+    # Inline items present after the header on the same line?
+    inline = m.group("inline").strip()
+    # Slice the text AFTER the header line
+    tail = block[m.end():]
+
+    # Stop at next section header (line ending with ':') OR next rank header
+    stop = len(tail)
+    next_section = re.search(r"^[A-Za-z0-9].*?:\s*$", tail, re.MULTILINE)
+    if next_section:
+        stop = min(stop, next_section.start())
+    next_rank = _RANK_HEADER_RE.search(tail)
+    if next_rank:
+        stop = min(stop, next_rank.start())
+
+    body = tail[:stop]
+
+    out: List[str] = []
+    if inline:
+        out.append(inline)  # keep inline content as the first “line”
+    # Then add subsequent non-empty lines
+    out.extend(ln.strip() for ln in body.splitlines() if _norm(ln))
+    return out
+
+def _split_items(lines: List[str]) -> List[str]:
+    items = []
+    for ln in lines:
+        parts = [x.strip(" -•\t") for x in re.split(r"[;,]", ln) if x and len(x.strip()) > 1]
+        items.extend(parts)
+    return [i for i in (_norm(x) for x in items) if i]
+
+# ============================================================
+# Public extractors
+# ============================================================
 
 def try_answer_rank_striking(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
-    ql = question.lower()
-    rank_label = _parse_rank_label(ql)
-    if not rank_label:
+    """
+    Answer kick/punch lists for a specific rank.
+    Default: rank-only (what is assessed/introduced at that rank).
+    If user asks cumulative (e.g., "need to know by 8th kyu"), merge 9th-kyu foundational kicks.
+    """
+    ql = _lc(question)
+    # intent
+    wants_kicks = any(w in ql for w in ["kick", "kicks", "geri"])
+    wants_punches = any(w in ql for w in ["punch", "punches", "tsuki", "ken", "strike", "striking"])
+    if not (wants_kicks or wants_punches):
         return None
 
-    wants_kicks   = bool(_KICK_INTENT.search(ql))
-    wants_punches = bool(_PUNCH_INTENT.search(ql))
-    wants_strikes = bool(_STRIKE_INTENT.search(ql)) or (not wants_kicks and not wants_punches)
+    # cumulative intent? (BROADER)
+    cumulative = (
+        ("need to know" in ql) or
+        any(phrase in ql for phrase in [
+            "need to know by", "up through", "up to", "all kicks for", "everything for", "study list"
+        ]) or
+        re.search(r"\bby\s+\d+(st|nd|rd|th)\s+kyu\b", ql) is not None
+    )
 
-    rank_passages = _pick_rank_passages(passages)
-    full_text = "\n\n".join(p["text"] for p in rank_passages)
+    rank_key = _rank_key_from_question(question)
+    if not rank_key:
+        return None
 
-    block = _find_rank_block(full_text, rank_label)
+    rank_text = _find_rank_text_from_passages(passages)
+    if not rank_text:
+        return None
+
+    # Current-rank block
+    block = _extract_rank_block(rank_text, rank_key)
     if not block:
         return None
 
-    striking = _extract_striking_line(block)
-    tokens = _split_items(striking) if striking else _split_items(block)
+    lines = _extract_section_lines(block, "Striking:")
+    if not lines:
+        return None
 
-    kicks   = [x for x in tokens if _is_kick(x)]
-    punches = [x for x in tokens if _is_punch(x)]
+    raw_items = _split_items(lines)
 
-    parts: List[str] = []
-    if wants_kicks or (wants_strikes and kicks):
-        parts.append(f"{rank_label} kicks: " + (", ".join(kicks) if kicks else "(none listed)") + ".")
-    if wants_punches or (wants_strikes and punches):
-        parts.append(f"{rank_label} punches: " + (", ".join(punches) if punches else "(none listed)") + ".")
+    # Split into kicks/punches for this rank
+    kicks, punches = [], []
+    for it in raw_items:
+        it_l = _lc(it)
+        if "geri" in it_l:
+            kicks.append(it)
+        elif any(w in it_l for w in ["tsuki", "shuto", "ken", "strike"]):
+            punches.append(it)
+        else:
+            punches.append(it)
 
-    if parts:
-        return " ".join(parts)
-    if wants_kicks and not kicks:
-        return f"{rank_label} kicks: (none listed)."
-    if wants_punches and not punches:
-        return f"{rank_label} punches: (none listed)."
-    return None
+    kicks = _dedup(kicks)
+    punches = _dedup(punches)
 
-# ---------- NAGE WAZA (throws) ----------
-_NAGE_HEAD_RE = re.compile(r"(?i)^\s*(?:nage\s*-?\s*waza|throws)\s*(?::|[-–—])?\s*(.*)$")
-_THROW_INTENT = re.compile(r"\b(throw|throws|toss|nage|projection|take\s*down|takedown)\b", re.I)
+    # ---- CUMULATIVE OPTION: add 9th-kyu foundational kicks only if user asks cumulative
+    carry_kicks = []
+    if cumulative and rank_key != "9th kyu":
+        nine_block = _extract_rank_block(rank_text, "9th kyu")
+        if nine_block:
+            nine_lines = _extract_section_lines(nine_block, "Striking:")
+            nine_items = _split_items(nine_lines)
+            for it in nine_items:
+                if "geri" in _lc(it):
+                    carry_kicks.append(it)
+        carry_kicks = _dedup([k for k in carry_kicks if _lc(k) not in {_lc(x) for x in kicks}])
 
-def _extract_nage_line(block_text: str) -> Optional[str]:
-    for ln in _split_lines(block_text):
-        m = _NAGE_HEAD_RE.match(ln)
+    # Pretty labels with aliases
+    kicks_pretty = [_with_kick_aliases(k) for k in kicks]
+    punches_pretty = [_with_punch_aliases(p) for p in punches]
+    carry_pretty = [_with_kick_aliases(k) for k in carry_kicks]
+
+    # Normalize capitalization for header (avoid “8Th”)
+    def _title_rank(s: str) -> str:
+        m = re.match(r"(\d+)(st|nd|rd|th)\s+kyu", s, flags=re.I)
         if m:
-            rest = m.group(1).strip()
-            if rest:
-                return rest
-    return None
+            num, suf = m.group(1), m.group(2).lower()
+            return f"{num}{suf} Kyu"
+        return "Shodan" if s.lower() == "shodan" else s.title()
+
+    parts = []
+    if wants_kicks and kicks_pretty:
+        parts.append(f"{_title_rank(rank_key)} kicks: {_join_human(kicks_pretty)}.")
+        if cumulative and carry_pretty:
+            parts.append(f"Carryover (foundational): {_join_human(carry_pretty)}.")
+    if wants_punches and punches_pretty:
+        parts.append(f"{_title_rank(rank_key)} strikes: {_join_human(punches_pretty)}.")
+
+    return " ".join(parts) if parts else None
+
+
 
 def try_answer_rank_nage(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
-    ql = question.lower()
-    if not _THROW_INTENT.search(ql) and "nage" not in ql:
+    ql = _lc(question)
+    if not any(w in ql for w in ["nage", "throw", "throws", "nage waza"]):
         return None
 
-    rank_label = _parse_rank_label(ql)
-    if not rank_label:
+    rank_key = _rank_key_from_question(question)
+    if not rank_key:
         return None
 
-    rank_passages = _pick_rank_passages(passages)
-    full_text = "\n\n".join(p["text"] for p in rank_passages)
-    block = _find_rank_block(full_text, rank_label)
+    rank_text = _find_rank_text_from_passages(passages)
+    if not rank_text:
+        return None
+
+    block = _extract_rank_block(rank_text, rank_key)
     if not block:
         return None
 
-    nage = _extract_nage_line(block)
-    items = _split_items(nage) if nage else _split_items(block)
+    lines = _extract_section_lines(block, "Nage waza:")
+    if not lines:
+        return None
 
-    if nage is not None and not items:
-        return f"{rank_label} throws (Nage waza): (none listed)."
+    items = _dedup(_split_items(lines))
+    if not items:
+        return None
 
-    if items:
-        return f"{rank_label} throws (Nage waza): " + ", ".join(items) + "."
+    return f"{rank_key.title()} throws: {_join_human(items)}."
 
-    return None
-
-# ---------- JIME WAZA (chokes) ----------
-_JIME_HEAD_RE = re.compile(r"(?i)^\s*(?:jime\s*-?\s*waza|chokes?)\s*(?::|[-–—])?\s*(.*)$")
-_CHOKE_INTENT = re.compile(r"\b(choke|chokes|strangle|jime|strangulation)\b", re.I)
-
-def _extract_jime_line(block_text: str) -> Optional[str]:
-    for ln in _split_lines(block_text):
-        m = _JIME_HEAD_RE.match(ln)
-        if m:
-            rest = m.group(1).strip()
-            if rest:
-                return rest
-    return None
 
 def try_answer_rank_jime(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
-    ql = question.lower()
-    if not _CHOKE_INTENT.search(ql) and "jime" not in ql:
+    ql = _lc(question)
+    if not any(w in ql for w in ["jime", "choke", "chokes", "strangle"]):
         return None
 
-    rank_label = _parse_rank_label(ql)
-    if not rank_label:
+    rank_key = _rank_key_from_question(question)
+    if not rank_key:
         return None
 
-    rank_passages = _pick_rank_passages(passages)
-    full_text = "\n\n".join(p["text"] for p in rank_passages)
-    block = _find_rank_block(full_text, rank_label)
+    rank_text = _find_rank_text_from_passages(passages)
+    if not rank_text:
+        return None
+
+    block = _extract_rank_block(rank_text, rank_key)
     if not block:
         return None
 
-    jime = _extract_jime_line(block)
-    items = _split_items(jime) if jime else _split_items(block)
-
-    if jime is not None and not items:
-        return f"{rank_label} chokes (Jime waza): (none listed)."
-
-    if items:
-        return f"{rank_label} chokes (Jime waza): " + ", ".join(items) + "."
-
-    return None
-
-# ---------- WEAPONS (Buki) ----------
-_WEAPON_HEAD_RE = re.compile(r"(?i)^\s*(?:weapons?|buki)\s*(?::|[-–—])?\s*(.*)$")
-_WEAPON_INTENT = re.compile(
-    r"\b(weapon|weapons|buki|sword|katana|tanto|bokken|bo|hanbo|staff|stick|yari|naginata|shuriken|kusari(?:fundo)?|rope|shoge|kyoketsu(?:\s*shoge)?)\b",
-    re.I
-)
-
-def _extract_weapon_line(block_text: str) -> Optional[str]:
-    for ln in _split_lines(block_text):
-        m = _WEAPON_HEAD_RE.match(ln)
-        if m:
-            rest = m.group(1).strip()
-            if rest:
-                return rest
-    return None
-
-def try_answer_rank_weapons(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
-    ql = question.lower()
-    if not _WEAPON_INTENT.search(ql):
+    lines = _extract_section_lines(block, "Jime waza:")
+    if not lines:
         return None
 
-    rank_label = _parse_rank_label(ql)
-    if not rank_label:
+    items = _dedup(_split_items(lines))
+    if not items:
         return None
 
-    rank_passages = _pick_rank_passages(passages)
-    full_text = "\n\n".join(p["text"] for p in rank_passages)
-    block = _find_rank_block(full_text, rank_label)
+    return f"{rank_key.title()} chokes: {_join_human(items)}."
+
+
+def try_answer_rank_requirements(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
+    """
+    Summarize the single-rank block when the user asks for 'requirements for X kyu'.
+    Keeps output scoped to ONE rank (prevents 'all ranks' dump).
+    """
+    ql = _lc(question)
+    if not any(w in ql for w in ["requirement", "requirements", "what do i need for", "rank checklist"]):
+        return None
+
+    rank_key = _rank_key_from_question(question)
+    if not rank_key:
+        return None
+
+    rank_text = _find_rank_text_from_passages(passages)
+    if not rank_text:
+        return None
+
+    block = _extract_rank_block(rank_text, rank_key)
     if not block:
         return None
 
-    wl = _extract_weapon_line(block)
-    items = _split_items(wl) if wl else _split_items(block)
+    sections = []
 
-    if wl is not None and not items:
-        return f"{rank_label} weapons: (none listed)."
+    def add_section(label: str):
+        lines = _extract_section_lines(block, label)
+        if lines:
+            # If inline + list, split items; otherwise join lines
+            if any(sep in " ".join(lines) for sep in [",", ";"]):
+                content = _join_human(_dedup(_split_items(lines)))
+            else:
+                content = " ".join(lines)
+            content = _norm(content)
+            if content:
+                sections.append(f"{label} {content}")
 
-    if items:
-        return f"{rank_label} weapons: " + ", ".join(items) + "."
+    header_line = re.split(r"\r?\n", block, maxsplit=1)[0].strip()
+    add_section("Kamae:")
+    add_section("Ukemi:")
+    add_section("Kaiten:")
+    add_section("Taihenjutsu:")
+    add_section("Blocking:")
+    add_section("Striking:")
+    add_section("Kihon Happo:")
+    add_section("San Shin no Kata:")
+    add_section("Nage waza:")
+    add_section("Jime waza:")
+    add_section("Kyusho:")
+    add_section("Other:")
 
-    return None
+    if not sections:
+        return header_line
+
+    return f"{header_line}\n" + "\n".join(sections)
