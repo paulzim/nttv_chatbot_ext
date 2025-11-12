@@ -5,39 +5,22 @@ import unicodedata
 from difflib import SequenceMatcher
 from typing import List, Dict, Any, Optional
 
-# These imports are safe even if the helper returns partial fields;
-# we won’t trust description from here unless it exists.
+# Optional indexed helpers (we won't rely on them)
 try:
     from .technique_loader import parse_technique_md, build_indexes
 except Exception:
-    # Make them optional; CSV fallback will still work.
     parse_technique_md = None
     build_indexes = None
 
-# Concept words we never treat as specific techniques
-CONCEPT_BANS = ("kihon happo", "sanshin", "school", "schools", "ryu", "ryū")
+# Words that indicate concept questions, not single techniques
+CONCEPT_BANS = ("kihon happo", "kihon happō", "sanshin", "school", "schools", "ryu", "ryū")
 
 TRIGGERS = ("what is", "define", "explain")
-NAME_HINTS = (
-    "gyaku", "dori", "kudaki", "gatame", "otoshi", "nage", "seoi", "kote",
-    "musha", "take ori", "juji", "omote", "ura", "ganseki", "hodoki",
-    "kata", "no kata",
-)
+NAME_HINTS = ("gyaku","dori","kudaki","gatame","otoshi","nage","seoi","kote",
+              "musha","take ori","juji","omote","ura","ganseki","hodoki",
+              "kata","no kata")
 
-# Expected positional schema for fallback rows (12 columns)
-#  0 name
-#  1 japanese
-#  2 translation
-#  3 type
-#  4 rank
-#  5 in_rank
-#  6 primary_focus
-#  7 safety
-#  8 partner_required
-#  9 solo
-# 10 tags
-# 11 description  <-- absorbs ALL remaining commas
-EXPECTED_COLS = 12
+EXPECTED_COLS = 12  # positional schema (name,..., description absorbs commas)
 
 def _norm_space(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "").strip())
@@ -85,7 +68,7 @@ def _candidate_variants(raw: str) -> List[str]:
         v.append(raw[:-8].strip())
     else:
         v.append(f"{raw} no kata")
-    # hyphen insensitivity
+    # hyphen-insensitive + spacing
     raw_no_hy = raw.replace("-", " ")
     if raw_no_hy != raw:
         v.append(raw_no_hy)
@@ -93,7 +76,7 @@ def _candidate_variants(raw: str) -> List[str]:
             v.append(raw_no_hy[:-8].strip())
         else:
             v.append(f"{raw_no_hy} no kata")
-    # folded + lite forms
+    # folded + lite
     v.append(_fold(raw))
     v.append(_lite(raw))
     # de-dupe preserve order
@@ -102,12 +85,6 @@ def _candidate_variants(raw: str) -> List[str]:
         if x not in seen:
             out.append(x); seen.add(x)
     return out
-
-def _wordhit(alias: str, hay: str) -> bool:
-    if not alias:
-        return False
-    pat = r"(?<!\w)" + re.escape(alias) + r"(?!\w)"
-    return re.search(pat, hay) is not None
 
 def _fmt_bool(v: Optional[bool]) -> str:
     if v is True: return "Yes"
@@ -137,35 +114,25 @@ def _format_bullets(rec: Dict[str, Any]) -> str:
     else:             lines.append(f"- Definition: (not listed).")
     return "\n".join(lines)
 
-# ---------- CSV fallback (manual limited split; description absorbs commas) ----------
+# ----- CSV helpers (description absorbs commas) -----
 
 def _iter_csv_like_lines(md_text: str):
-    """Yield CSV-like lines from markdown, skipping headings/fences/empties."""
     for raw in (md_text or "").splitlines():
         st = raw.strip()
         if not st:
             continue
         if st.startswith("#") or st.startswith("```"):
             continue
-        # only treat lines that look like rows (comma-separated)
         if "," in raw:
             yield raw
 
 def _split_row_limited(raw: str) -> List[str]:
-    """
-    Split a CSV-like line by commas, but only the first 11 commas become columns.
-    Column 12 (index 11) = 'description' absorbs the remainder (commas allowed).
-    """
-    parts = raw.split(",", EXPECTED_COLS - 1)
-    # strip whitespace around each cell
+    parts = raw.split(",", EXPECTED_COLS - 1)  # last field absorbs the rest
     parts = [p.strip() for p in parts]
-    # If there are MORE than EXPECTED_COLS (shouldn’t happen with maxsplit),
-    # fold extras into the last slot for safety.
     if len(parts) > EXPECTED_COLS:
         head = parts[:EXPECTED_COLS-1]
         tail = ",".join(parts[EXPECTED_COLS-1:])
         parts = head + [tail]
-    # pad missing cells
     if len(parts) < EXPECTED_COLS:
         parts += [""] * (EXPECTED_COLS - len(parts))
     return parts
@@ -177,6 +144,12 @@ def _has_header(cells: List[str]) -> bool:
     header = [c.strip().lower() for c in cells]
     return any(h in {"name","translation","japanese","description"} for h in header)
 
+def _to_bool(x: str) -> Optional[bool]:
+    v = (x or "").strip().lower()
+    if v in {"1","true","yes","y","✅","✓","✔"}: return True
+    if v in {"0","false","no","n","❌","✗","✕"}: return False
+    return None
+
 def _row_to_record_positional(row: List[str]) -> Dict[str, Any]:
     rec: Dict[str, Any] = {
         "name": row[0],
@@ -187,35 +160,50 @@ def _row_to_record_positional(row: List[str]) -> Dict[str, Any]:
         "in_rank": row[5],
         "primary_focus": row[6],
         "safety": row[7],
-        "partner_required": row[8],
-        "solo": row[9],
+        "partner_required": _to_bool(row[8]),
+        "solo": _to_bool(row[9]),
         "tags": row[10],
         "description": row[11],
     }
-    # best-effort booleans
-    def to_bool(x: str) -> Optional[bool]:
-        v = (x or "").strip().lower()
-        if v in {"1","true","yes","y","✅","✓","✔"}: return True
-        if v in {"0","false","no","n","❌","✗","✕"}: return False
-        return None
-    rec["partner_required"] = to_bool(rec.get("partner_required") or "")
-    rec["solo"] = to_bool(rec.get("solo") or "")
     return rec
+
+# ----- NEW: Direct line lookup anchored to technique name -----
+
+def _direct_line_lookup(md_text: str, cand_variants: List[str]) -> Optional[Dict[str, Any]]:
+    """
+    Find a line that *starts* with the technique name (case/macrón-insensitive),
+    then parse it as a positional CSV row.
+    """
+    # build set of folded anchors (e.g., 'jumonji no kata')
+    anchors = { _fold(v) for v in cand_variants if v and not v.startswith("#") }
+    if not anchors:
+        return None
+
+    for raw in (md_text or "").splitlines():
+        line = raw.rstrip()
+        if not line or "," not in line:
+            continue
+        # take the first field (before first comma), fold it, compare to anchors
+        first = line.split(",", 1)[0].strip()
+        if _fold(first) in anchors:
+            row = _split_row_limited(line)
+            return _row_to_record_positional(row)
+    return None
+
+# ----- CSV table lookup (fallback) -----
 
 def _csv_fallback_lookup(md_text: str, cand_variants: List[str]) -> Optional[Dict[str, Any]]:
     rows = _scan_csv_rows_limited(md_text)
     if not rows:
         return None
 
-    # Detect header
     has_header = _has_header(rows[0])
     data_rows = rows[1:] if has_header else rows
 
-    # Folded variants
     cand_folded = [_fold(c) for c in cand_variants]
     cand_lite = [_lite(c) for c in cand_variants]
 
-    best = (None, 0.0, None)  # (row, score, name)
+    best = (None, 0.0, None)
     for r in data_rows:
         if not r or not r[0].strip():
             continue
@@ -223,28 +211,20 @@ def _csv_fallback_lookup(md_text: str, cand_variants: List[str]) -> Optional[Dic
         name_fold = _fold(name)
         name_lite = _lite(name)
 
-        # exact-ish
         if name_fold in cand_folded or name_lite in cand_lite:
             return _row_to_record_positional(r)
 
-        # fuzzy
         score = max(SequenceMatcher(None, name_fold, cf).ratio() for cf in cand_folded)
         if score > best[1]:
             best = (r, score, name)
 
     if best[0] is not None and best[1] >= 0.85:
         return _row_to_record_positional(best[0])
-
     return None
 
-# ---------- main entry ----------
+# ----- Public entrypoint -----
 
 def try_answer_technique(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
-    """
-    Deterministic lookup from Technique Descriptions.md.
-    NEW: Prefer CSV fallback (robust to commas in description). If that fails, try the
-    indexed path; if the indexed record lacks a description, retry CSV before returning.
-    """
     if not _looks_like_technique_q(question):
         return None
 
@@ -256,12 +236,17 @@ def try_answer_technique(question: str, passages: List[Dict[str, Any]]) -> Optio
     cand_raw = _extract_candidate(ql)
     variants = _candidate_variants(cand_raw)
 
-    # 1) CSV fallback FIRST (more robust for description field)
+    # 1) NEW: direct line lookup first (most robust for single-line CSV format)
+    rec = _direct_line_lookup(md_text, variants)
+    if rec:
+        return _format_bullets(rec)
+
+    # 2) CSV fallback (whole-file scan)
     rec = _csv_fallback_lookup(md_text, variants)
     if rec:
         return _format_bullets(rec)
 
-    # 2) Indexed route (only if helper exists)
+    # 3) Optional indexed route if available
     if parse_technique_md and build_indexes:
         try:
             records = parse_technique_md(md_text)
@@ -272,48 +257,19 @@ def try_answer_technique(question: str, passages: List[Dict[str, Any]]) -> Optio
             by_name = idx["by_name"]; by_lower = idx["by_lower"]
             by_fold = idx["by_fold"]; by_key = idx["by_keylite"]
 
-            # direct key lookups
+            # direct keys
             for v in variants:
                 key = v.lower()
                 if key in by_lower:
-                    rec2 = by_name[by_lower[key]]
-                    # If indexed rec is missing description, retry CSV:
-                    if not (rec2.get("description") or "").strip():
-                        rec = _csv_fallback_lookup(md_text, variants)
-                        if rec:
-                            return _format_bullets(rec)
-                    return _format_bullets(rec2)
-
+                    return _format_bullets(by_name[by_lower[key]])
                 fkey = _fold(v)
                 if fkey in by_fold:
-                    rec2 = by_name[by_fold[fkey]]
-                    if not (rec2.get("description") or "").strip():
-                        rec = _csv_fallback_lookup(md_text, variants)
-                        if rec:
-                            return _format_bullets(rec)
-                    return _format_bullets(rec2)
-
+                    return _format_bullets(by_name[by_fold[fkey]])
                 lkey = _lite(v)
                 if lkey in by_key:
-                    rec2 = by_name[by_key[lkey]]
-                    if not (rec2.get("description") or "").strip():
-                        rec = _csv_fallback_lookup(md_text, variants)
-                        if rec:
-                            return _format_bullets(rec)
-                    return _format_bullets(rec2)
+                    return _format_bullets(by_name[by_key[lkey]])
 
-            # whole-word checks
-            for table in (by_lower, by_fold):
-                for alias, canon in table.items():
-                    if _wordhit(alias, cand_raw) or _wordhit(alias, ql):
-                        rec2 = by_name[canon]
-                        if not (rec2.get("description") or "").strip():
-                            rec = _csv_fallback_lookup(md_text, variants)
-                            if rec:
-                                return _format_bullets(rec)
-                        return _format_bullets(rec2)
-
-            # fuzzy to canonical names
+            # fuzzy
             cq = _fold(cand_raw)
             best_name, best_score = None, 0.0
             for name in by_name.keys():
@@ -321,12 +277,6 @@ def try_answer_technique(question: str, passages: List[Dict[str, Any]]) -> Optio
                 if s > best_score:
                     best_name, best_score = name, s
             if best_name and best_score >= 0.80:
-                rec2 = by_name[best_name]
-                if not (rec2.get("description") or "").strip():
-                    rec = _csv_fallback_lookup(md_text, variants)
-                    if rec:
-                        return _format_bullets(rec)
-                return _format_bullets(rec2)
+                return _format_bullets(by_name[best_name])
 
-    # 3) No match
     return None

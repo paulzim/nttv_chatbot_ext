@@ -441,6 +441,105 @@ def inject_kihon_passage_if_needed(question: str, hits: List[Dict[str, Any]]) ->
     }
     return [synth] + hits
 
+# --- Technique CSV line injector (for single-technique queries) ----------------
+import unicodedata
+import re
+
+def _fold(s: str) -> str:
+    if not s:
+        return ""
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    return s.lower().strip()
+
+def _is_single_technique_query(q: str) -> Optional[str]:
+    """
+    Return a candidate technique name if the query looks like a single technique ask,
+    else None. Handles 'explain/define/what is ... (no kata)?'
+    """
+    ql = (q or "").strip().lower()
+    # ignore concept/bucket queries
+    for ban in ("kihon happo", "kihon happō", "sanshin", "school", "schools", "ryu", "ryū"):
+        if ban in ql:
+            return None
+    m = re.search(r"(?:what\s+is|define|explain)\s+(.+)$", q, flags=re.I)
+    cand = (m.group(1) if m else q).strip().rstrip("?!.")
+    # trim generic suffixes
+    cand = re.sub(r"\b(technique|in ninjutsu|in bujinkan)\b", "", cand, flags=re.I).strip()
+    return cand if 2 <= len(cand) <= 80 else None
+
+def _tech_name_variants(name: str) -> list[str]:
+    v = [name.strip()]
+    ln = name.strip().lower()
+    # add/remove 'no kata'
+    if ln.endswith(" no kata"):
+        v.append(name[:-8].strip())
+    else:
+        v.append(f"{name} no Kata")
+    # hyphen-insensitive
+    nh = name.replace("-", " ")
+    if nh != name:
+        v.append(nh)
+        if nh.lower().endswith(" no kata"):
+            v.append(nh[:-8].strip())
+        else:
+            v.append(f"{nh} no Kata")
+    # folded variant
+    v.append(_fold(name))
+    # de-dup preserve order
+    seen = set(); out = []
+    for x in v:
+        if x and x not in seen:
+            out.append(x); seen.add(x)
+    return out
+
+def _find_tech_line_in_chunks(name_variants: list[str]) -> Optional[str]:
+    """
+    Scan all CHUNKS for lines from Technique Descriptions.md whose first CSV cell
+    (technique name) matches any variant (macron-insensitive).
+    Return the full CSV line if found.
+    """
+    folded_targets = {_fold(v) for v in name_variants}
+    for c in CHUNKS:
+        src = (c["meta"].get("source") or "").lower()
+        if "technique descriptions.md" not in src:
+            continue
+        for raw in c["text"].splitlines():
+            line = raw.strip()
+            if not line or "," not in line:
+                continue
+            first = line.split(",", 1)[0].strip()
+            if _fold(first) in folded_targets:
+                return line
+    return None
+
+def inject_specific_technique_line_if_needed(question: str, passages: list[dict]) -> list[dict]:
+    """
+    If user asks for a single technique, look up the exact CSV line in the entire
+    Technique Descriptions.md (across all chunks) and prepend a synthetic passage.
+    """
+    cand = _is_single_technique_query(question)
+    if not cand:
+        return passages
+
+    variants = _tech_name_variants(cand)
+    line = _find_tech_line_in_chunks(variants)
+    if not line:
+        return passages
+
+    synth = {
+        "text": line,
+        "meta": {"source": "Technique Descriptions (synthetic line)", "priority": 1},
+        "source": "Technique Descriptions (synthetic line)",
+        "page": None,
+        "score": 1.0,
+        "rerank_score": 1.0,
+    }
+    # avoid duplicating if already present at top
+    if not passages or passages[0].get("text") != line:
+        return [synth] + passages
+    return passages
+
 
 # ---------------------------
 # LLM backend (fallback)
@@ -595,6 +694,8 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
     hits = inject_weapons_passage_if_needed(question, hits)
     hits = inject_kihon_passage_if_needed(question, hits)
     hits = inject_techniques_passage_if_needed(question, hits)
+    hits = inject_specific_technique_line_if_needed(question, hits)
+
 
     # 2.4) Schools LIST short-circuit
     if is_school_list_query(question):
