@@ -441,10 +441,21 @@ def try_answer_gyaku_waza(question: str, passages: List[Dict[str, Any]]) -> Opti
             return ans
 
     # List all joint locks
-    if _wants_list_joint_locks(question):
-        ans = _answer_list_locks(rows)
-        if ans:
-            return ans
+def _wants_list_joint_locks(question: str) -> bool:
+    q = _fold(question)
+    if not ("gyaku" in q or "joint lock" in q or "joint locks" in q or "locks" in q):
+        return False
+
+    return (
+        "list" in q
+        or "what are" in q
+        or "which" in q
+        or "name the" in q
+        or "show me" in q
+        # e.g. "what joint locks are in the curriculum?"
+        or ("what" in q and ("joint lock" in q or "joint locks" in q))
+    )
+
 
     # Specific named lock
     canon = _find_lock_name_in_question(question, alias_to_name)
