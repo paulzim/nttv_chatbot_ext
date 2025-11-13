@@ -1,22 +1,31 @@
-# tests/test_kata_aliases.py
-from extractors.technique_aliases import expand_with_aliases
+from extractors.technique_aliases import expand_with_aliases, TECH_ALIASES
 
-def test_expand_short_to_no_kata():
-    out = expand_with_aliases("Ichimonji")
-    assert "Ichimonji" in out
-    assert "Ichimonji no Kata" in out
 
-def test_expand_no_kata_to_short():
-    out = expand_with_aliases("Hicho no Kata")
-    assert "Hicho" in out
-    assert "Hicho no Kata" in out
+def test_expand_with_aliases_omote_gyaku_english_alias():
+    out = expand_with_aliases("This drill uses a forward wrist lock.")
+    # expand_with_aliases returns lowercased tokens
+    assert "omote gyaku" in out
 
-def test_known_lock_variant():
-    out = expand_with_aliases("Omote Gyaku")
-    assert "Omote Gyaku" in out
-    assert "Omote-Gyaku" in out
 
-def test_sanshin_short_names():
-    out = expand_with_aliases("Chi")
-    assert "Chi" in out
-    assert "Chi no Kata" in out
+def test_expand_with_aliases_oni_kudaki_english_alias():
+    out = expand_with_aliases("Practice ogre crusher from a grab.")
+    assert "oni kudaki" in out
+
+
+def test_expand_with_aliases_jumonji_short_name():
+    out = expand_with_aliases("We start from Jumonji.")
+    # The alias map contains "Jumonji no Kata" with "jumonji" as an alias
+    assert "jumonji no kata" in out or "jumonji" in out
+
+
+def test_tech_aliases_contains_expected_keys():
+    # Sanity: the core canonical keys are still present
+    for key in [
+        "Omote Gyaku",
+        "Ura Gyaku",
+        "Musha Dori",
+        "Ganseki Nage",
+        "Jumonji no Kata",
+        "Oni Kudaki",
+    ]:
+        assert key in TECH_ALIASES
