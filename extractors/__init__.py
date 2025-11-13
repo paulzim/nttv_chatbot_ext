@@ -40,6 +40,10 @@ from .taihenjutsu import try_answer_taihenjutsu
 # Dakentaijutsu
 from .dakentaijutsu import try_answer_dakentaijutsu
 
+# Nage waza
+from .nage_waza import try_answer_nage_waza
+
+
 
 
 def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
@@ -97,6 +101,11 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optiona
         return ans
 
     ans = try_answer_dakentaijutsu(question, passages)
+    if ans:
+        return ans
+    
+    # --- Nage Waza (throwing techniques list / specific throws in Nage context)
+    ans = try_answer_nage_waza(question, passages)
     if ans:
         return ans
 
