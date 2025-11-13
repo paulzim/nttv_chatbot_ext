@@ -1,175 +1,151 @@
 # extractors/kyusho.py
 # Deterministic Kyusho extractor
-# - Triggers on "kyusho"/"pressure point" or when a known point name appears in the question
+# - Only triggers on explicit kyusho / pressure-point questions
 # - Parses entries from retrieved passages only (no filesystem access)
-# - Returns either a concise list of points or a one-line location/description for a specific point
+# - Returns either a one-line location/description for a specific point,
+#   or a concise list of points when explicitly asked to list them.
 
 from __future__ import annotations
 import re
-from typing import List, Dict, Any, Tuple
+import unicodedata
+from typing import List, Dict, Any, Optional
 from .common import dedupe_preserve, join_oxford
 
-# ----------------------------
-# Parsing helpers (tolerant)
-# ----------------------------
 
-# Matches "Name: description" or "Name – description" styles
-LINE_KV = re.compile(r"^\s*[-•]?\s*([A-Z][A-Za-z0-9'’\-\s]+?)\s*[:–-]\s*(.+?)\s*$")
+def _fold(s: str) -> str:
+    """Case- and accent-insensitive fold."""
+    if not s:
+        return ""
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    return s.lower()
 
-# Matches "heading:" followed by bullet lines we can harvest
-HEADING = re.compile(r"^\s*([A-Z][A-Za-z0-9'’\-\s]+?)\s*:\s*$")
-BULLET  = re.compile(r"^\s*[-•]\s*(.+?)\s*$")
 
-# Generic “listy” line that might contain multiple points with commas/semicolons
-LISTY  = re.compile(r"[;,]")
-
-# Simple “where/what” detectors
-ASK_LIST = re.compile(r"\b(list|what\s+are|which)\b.*\b(kyusho|pressure\s*points?)\b", re.I)
-ASK_WHERE = re.compile(r"\b(where\s+is|location\s+of|where\s+are)\b", re.I)
-ASK_WHAT  = re.compile(r"\b(what\s+is|describe|definition\s+of)\b", re.I)
-
-def _norm(s: str) -> str:
-    return re.sub(r"\s+", " ", s.strip())
-
-def _looks_like_point_name(s: str) -> bool:
-    # Heuristic: short-ish proper names, allow ryu-like tokens but not sentences
-    # Many kyusho names are 1–3 words, often capitalized or romanized
-    w = s.strip()
-    return 2 <= len(w) <= 40 and not w.endswith((".", ":", ";"))
-
-def _split_candidates(line: str) -> List[str]:
-    # Break a semicolon/comma-heavy line into name-like tokens
-    parts = [p.strip(" -•\t") for p in re.split(r"[;,]", line) if p.strip()]
-    # Keep only plausible “names”
-    return [p for p in parts if _looks_like_point_name(p)]
-
-def _ingest_line_kv(line: str, store: Dict[str, str]) -> bool:
-    m = LINE_KV.match(line)
-    if not m:
-        return False
-    name, desc = _norm(m.group(1)), _norm(m.group(2))
-    if len(name) < 2 or len(desc) < 2:
-        return False
-    # Prefer first occurrence; later duplicates are ignored to stay stable
-    store.setdefault(name, desc)
-    return True
-
-def _parse_kyusho_entries(text: str) -> Dict[str, str]:
-    """Parse kyusho name → short description/location from a block of text."""
-    entries: Dict[str, str] = {}
-    lines = text.splitlines()
-
-    i = 0
-    while i < len(lines):
-        line = lines[i].rstrip()
-        # 1) "Name: desc" direct form
-        if _ingest_line_kv(line, entries):
-            i += 1
-            continue
-
-        # 2) "Heading:" followed by bullets
-        mh = HEADING.match(line)
-        if mh:
-            # Accumulate bullets until blank or next heading
-            j = i + 1
-            bucket: List[str] = []
-            while j < len(lines) and lines[j].strip():
-                mb = BULLET.match(lines[j])
-                if mb:
-                    bucket.append(_norm(mb.group(1)))
-                    j += 1
-                else:
-                    break
-            # Convert bullets into entries if they look like "Name - desc" or "Name: desc"
-            for b in bucket:
-                if _ingest_line_kv(b, entries):
-                    continue
-                # Fallback: treat as a candidate name with no explicit desc
-                # (we store empty desc; later we can still answer list-type queries)
-                if _looks_like_point_name(b):
-                    entries.setdefault(b, "")
-            i = j
-            continue
-
-        # 3) Listy lines with multiple candidates (e.g., “X, Y, Z (temple), ...”)
-        if LISTY.search(line):
-            for cand in _split_candidates(line):
-                entries.setdefault(cand, "")
-            i += 1
-            continue
-
-        i += 1
-
-    return entries
-
-def _gather_entries(passages: List[Dict[str, Any]], limit: int = 8) -> Dict[str, str]:
-    merged: Dict[str, str] = {}
-    for p in passages[:limit]:
-        text = p.get("text", "")
-        if not text or len(text) < 10:
-            continue
-        block = _parse_kyusho_entries(text)
-        for k, v in block.items():
-            if k not in merged or (not merged[k] and v):
-                merged[k] = v
-    return merged
-
-def _match_point_in_question(question: str, names: List[str]) -> Tuple[str | None, List[str]]:
-    ql = question.lower()
-    hits = []
-    for n in names:
-        nl = n.lower()
-        if nl in ql:
-            hits.append(n)
-    best = hits[0] if hits else None
-    return best, hits
-
-# ----------------------------
-# Public extractor entry
-# ----------------------------
-
-def try_answer_kyusho(question: str, passages: List[Dict[str, Any]]) -> str | None:
+def _looks_like_kyusho_question(question: str) -> bool:
     """
-    Returns:
-      - A short comma list of kyusho names (when user asks to list)
-      - OR a one-sentence location/description for a specific point
-      - OR None (let other extractors / RAG handle it)
-    """
-    ql = question.lower()
-    trigger_words = ("kyusho", "kyūsho", "pressure point", "pressure points")
-    if not any(w in ql for w in trigger_words):
-        # We also allow implicit triggers if the question contains a known point name
-        # after we parse entries below.
-        pass
+    Only treat this as a kyusho question when the user clearly references
+    kyusho / pressure points.
 
-    entries = _gather_entries(passages, limit=8)
-    if not entries:
+    This avoids stealing technique questions like 'describe Oni Kudaki'.
+    """
+    q = _fold(question)
+    return (
+        "kyusho" in q
+        or "pressure point" in q
+        or "pressure points" in q
+    )
+
+
+def _gather_kyusho_text(passages: List[Dict[str, Any]]) -> str:
+    """Concatenate KYUSHO-related passages."""
+    buf: List[str] = []
+    for p in passages:
+        src = _fold(p.get("source") or "")
+        if "kyusho" in src:
+            buf.append(p.get("text", ""))
+    return "\n".join(buf)
+
+
+def _parse_points(text: str) -> Dict[str, str]:
+    """
+    Very simple parser for KYUSHO.txt.
+
+    We look for lines of the form:
+
+        NAME: description...
+
+    or bullet variants:
+
+        - Name: description...
+
+    and build a {folded_name -> description} mapping.
+    """
+    points: Dict[str, str] = {}
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+
+        # Strip bullets if present
+        if line.startswith(("-", "*")):
+            line = line[1:].strip()
+
+        if ":" not in line:
+            continue
+
+        name, desc = line.split(":", 1)
+        name = name.strip()
+        desc = desc.strip()
+        if not name:
+            continue
+
+        key = _fold(name)
+        # Prefer the first occurrence; later duplicates can be ignored
+        if key not in points:
+            points[key] = desc
+
+    return points
+
+
+def _match_point_name(question: str, points: Dict[str, str]) -> Optional[str]:
+    """Return the folded key of the first kyusho name mentioned in the question."""
+    q = _fold(question)
+    for key in points.keys():
+        # kyusho names are short (1–2 tokens): 'ura kimon', 'kasumi', 'suigetsu', etc.
+        if key and key in q:
+            return key
+    return None
+
+
+def try_answer_kyusho(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
+    """
+    Deterministic kyusho extractor.
+
+    - Only triggers when the question clearly references kyusho / pressure points.
+    - Uses KYUSHO.txt to answer:
+        * 'Where is Ura Kimon kyusho?' style questions
+        * 'List the kyusho pressure points' style questions
+    """
+    if not _looks_like_kyusho_question(question):
         return None
 
-    # If no trigger word, see if the question mentions a known point explicitly
-    if not any(w in ql for w in trigger_words):
-        name_hit, _ = _match_point_in_question(question, list(entries.keys()))
-        if not name_hit:
-            return None
+    text = _gather_kyusho_text(passages)
+    if not text.strip():
+        return None
 
-    # Handle "where is", "location of", "what is" types first
-    name_hit, _ = _match_point_in_question(question, list(entries.keys()))
-    if name_hit:
-        desc = entries.get(name_hit, "").strip()
+    points = _parse_points(text)
+    if not points:
+        return None
+
+    q = _fold(question)
+    key = _match_point_name(question, points)
+
+    # If the user clearly asked about a specific point and we can find it
+    if key:
+        desc = points.get(key, "").strip()
+        name_display = " ".join(w.capitalize() for w in key.split())
         if desc:
-            # Keep it to one clean sentence; strip trailing punctuation noise
-            return f"{name_hit}: {desc.rstrip(' ;,')}"
+            return f"{name_display}: {desc}"
         else:
-            # We know the point name, but no description present in context
-            return f"{name_hit}: (location/description not listed in the provided context)."
+            return (
+                f"{name_display}: (location/description not listed in the provided context)."
+            )
 
-    # Otherwise assume list request if explicitly asked
-    if ASK_LIST.search(question) or "kyusho" in ql or "pressure point" in ql:
-        names = dedupe_preserve([k for k in entries.keys()])
+    # No specific point matched: check for list-style queries
+    if "list" in q or ("what" in q and "points" in q):
+        names = dedupe_preserve([k for k in points.keys()])
         if not names:
             return None
-        # Short, readable comma list; cap at ~20 to avoid walls of text
-        names = names[:20]
-        return join_oxford(names)
+        # Use the raw names (unfolded) for display where possible
+        display_names = [
+            " ".join(w.capitalize() for w in n.split()) for n in names[:20]
+        ]
+        return join_oxford(display_names)
 
+    # Otherwise, let upstream handlers try
     return None
+
+
+# Backwards-compat alias for the router, if it imports try_kyusho
+def try_kyusho(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
+    return try_answer_kyusho(question, passages)
