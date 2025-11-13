@@ -37,6 +37,9 @@ from .leadership import try_extract_answer as try_leadership
 # Taihenjutsu
 from .taihenjutsu import try_answer_taihenjutsu
 
+# Dakentaijutsu
+from .dakentaijutsu import try_answer_dakentaijutsu
+
 
 
 def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
@@ -90,6 +93,10 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optiona
 
     # --- Kamae (stances: rank, weapon, specific kamae)
     ans = try_answer_kamae(question, passages)
+    if ans:
+        return ans
+
+    ans = try_answer_dakentaijutsu(question, passages)
     if ans:
         return ans
 
