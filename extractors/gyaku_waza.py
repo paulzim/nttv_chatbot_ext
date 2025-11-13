@@ -1,4 +1,3 @@
-# extractors/gyaku_waza.py
 from __future__ import annotations
 from typing import List, Dict, Any, Optional
 from pathlib import Path
@@ -256,6 +255,8 @@ def _wants_list_joint_locks(question: str) -> bool:
         or "which" in q
         or "name the" in q
         or "show me" in q
+        # e.g. "what joint locks are in the curriculum?"
+        or ("what" in q and ("joint lock" in q or "joint locks" in q))
     )
 
 
@@ -433,29 +434,20 @@ def try_answer_gyaku_waza(question: str, passages: List[Dict[str, Any]]) -> Opti
     if not _looks_like_gyaku_question(question, alias_to_name):
         return None
 
+    fq = _fold(question)
+
     # Rank-specific lock list: "what joint locks are at 6th kyu?"
     rank_query = _extract_rank_from_question(question)
-    if rank_query and ("joint lock" in _fold(question) or "joint locks" in _fold(question) or "gyaku" in _fold(question)):
+    if rank_query and ("joint lock" in fq or "joint locks" in fq or "gyaku" in fq):
         ans = _answer_locks_for_rank(rank_query, rows)
         if ans:
             return ans
 
-    # List all joint locks
-def _wants_list_joint_locks(question: str) -> bool:
-    q = _fold(question)
-    if not ("gyaku" in q or "joint lock" in q or "joint locks" in q or "locks" in q):
-        return False
-
-    return (
-        "list" in q
-        or "what are" in q
-        or "which" in q
-        or "name the" in q
-        or "show me" in q
-        # e.g. "what joint locks are in the curriculum?"
-        or ("what" in q and ("joint lock" in q or "joint locks" in q))
-    )
-
+    # List all joint locks (explicit list intent)
+    if _wants_list_joint_locks(question):
+        ans = _answer_list_locks(rows)
+        if ans:
+            return ans
 
     # Specific named lock
     canon = _find_lock_name_in_question(question, alias_to_name)
@@ -470,5 +462,12 @@ def _wants_list_joint_locks(question: str) -> bool:
 
         # Full profile
         return _format_joint_lock(row)
+
+    # Last-resort: generic "what joint locks..." question with no
+    # specific name or rank -> treat as list request.
+    if ("joint lock" in fq or "joint locks" in fq) and not rank_query:
+        ans = _answer_list_locks(rows)
+        if ans:
+            return ans
 
     return None
