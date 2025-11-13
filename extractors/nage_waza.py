@@ -169,8 +169,8 @@ def _answer_nage_list(question: str, records: Dict[str, Dict[str, str]]) -> Opti
         or "what are" in q
         or "which" in q
         or "name the" in q
+        # e.g. "what throws are in nage waza?"
         or ("what" in q and "throws" in q)
-        or ("what" in q and "nage waza" in q)
     )
     if not wants_list:
         return None

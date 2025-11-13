@@ -63,6 +63,8 @@ Uchi Gake, 内掛け, Inner Hook Throw, Tripping Throw, 4th Kyu, ✅, Leg Hook, 
 Hiza Guruma, 膝車, Knee Wheel Throw, Tripping Throw, 3rd Kyu, ✅, Knee, Medium, True, False, knee wheel|knee block|off-balance, A knee-level throw rotating uke off balance by blocking the leg pivot point.
 Sui Nage, 水投げ, Water Throw, Tripping Throw, 4th Kyu, ✅, Full Body, Medium, True, False, water throw|fluid motion|evade and redirect, A throw using evasive redirection and flowing body mechanics to off-balance uke.
 Oosoto Guruma, 大外車, Major Outer Wheel Throw, Tripping Throw, 4th Kyu, ✅, Leg Sweep, High, True, False, outer wheel throw|circular|leg reaping, A reaping throw using circular leg motion to sweep uke forcefully.
+Tomoe Nage, 巴投げ, Circular Throw, Throw, 4th Kyu, ✅, Sacrifice Throw, Medium, True, False, sacrifice|throw|back roll|leg lift, A backward sacrifice throw where you off-balance the opponent, place your foot at their abdomen (koe), roll back, and launch them over your center. Escape ukemi: Hicho Kaiten.
+
 
 Itami Nage, 痛み投げ, Pain Throw, Attack Throw, 4th Kyu, ✅, Joint/Pressure Point, Medium, True, False, pain throw|kyusho|control via pain, A throw initiated by pain compliance through pressure points or joint manipulation.
 Katate Nage, 片手投げ, One-Hand Throw, Attack Throw, 4th Kyu, ✅, Arm / Shoulder, Medium, True, False, one-hand throw|minimal contact|lever-based, A throw using one hand to apply leverage or momentum redirection.

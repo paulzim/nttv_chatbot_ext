@@ -43,6 +43,9 @@ from .dakentaijutsu import try_answer_dakentaijutsu
 # Nage waza
 from .nage_waza import try_answer_nage_waza
 
+# Gyaku waza
+from .gyaku_waza import try_answer_gyaku_waza
+
 
 
 
@@ -106,6 +109,11 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optiona
     
     # --- Nage Waza (throwing techniques list / specific throws in Nage context)
     ans = try_answer_nage_waza(question, passages)
+    if ans:
+        return ans
+    
+    # --- Gyaku / joint locks
+    ans = try_answer_gyaku_waza(question, passages)
     if ans:
         return ans
 
