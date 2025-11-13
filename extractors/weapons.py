@@ -222,6 +222,13 @@ def try_answer_weapon_rank(question: str, passages: List[Dict[str, Any]]) -> Opt
       2) First rank in WEAPONS list for that weapon from nttv training reference.txt
       3) Glossary (if at least defines, but then no rank will be stated)
     """
+
+    # If the user is clearly asking about kamae / stances, let the Kamae
+    # extractor handle it instead of treating this as a rank question.
+    q_low = (question or "").lower()
+    if "kamae" in q_low or "stance" in q_low or "stances" in q_low:
+        return None
+
     target = _weapon_key_from_query(question)
     if not target:
         return None
@@ -247,14 +254,16 @@ def try_answer_weapon_rank(question: str, passages: List[Dict[str, Any]]) -> Opt
     if table:
         first_rank = _first_rank_for_weapon(table, target)
         if first_rank:
-            return f"{_display_name_for_target(rows, target)} is introduced at {first_rank}."
+            name = _display_name_for_target(rows, target)
+            return f"{name} is introduced at {first_rank}."
 
-    # (3) Glossary fallback (definition only)
+    # (3) Glossary fallback (no rank info, but at least define the weapon)
     gloss = _glossary_one_liner(passages, target)
     if gloss:
         return gloss
 
     return None
+
 
 def try_answer_weapon_profile(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
     """
