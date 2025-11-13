@@ -1,4 +1,3 @@
-# extractors/techniques.py
 from __future__ import annotations
 import re
 import unicodedata
@@ -16,7 +15,7 @@ except Exception:
 CONCEPT_BANS = ("kihon happo", "kihon happō", "sanshin", "school", "schools", "ryu", "ryū")
 
 # Light heuristics to spot single-technique queries
-TRIGGERS = ("what is", "define", "explain")
+TRIGGERS = ("what is", "define", "explain", "describe")
 NAME_HINTS = (
     "gyaku","dori","kudaki","gatame","otoshi","nage","seoi","kote",
     "musha","take ori","juji","omote","ura","ganseki","hodoki",
@@ -65,10 +64,24 @@ def _gather_full_technique_text(passages: List[Dict[str, Any]]) -> str:
     return "\n".join(buf)
 
 def _extract_candidate(ql: str) -> str:
-    """Pull the thing after 'what is|define|explain' … else return ql."""
-    m = re.search(r"(?:what\s+is|define|explain)\s+(.+)$", ql, flags=re.I)
+    """
+    Pull the thing after 'what is|define|explain|describe' … else return ql.
+
+    This keeps the candidate clean so 'describe Oni Kudaki' becomes just
+    'Oni Kudaki' for matching against Technique Descriptions.
+    """
+    m = re.search(
+        r"(?:what\s+is|define|explain|describe)\s+(.+)$",
+        ql,
+        flags=re.I,
+    )
     cand = (m.group(1) if m else ql).strip().rstrip("?!.")
-    cand = re.sub(r"\b(technique|in ninjutsu|in bujinkan)\b", "", cand, flags=re.I).strip()
+    cand = re.sub(
+        r"\b(technique|in ninjutsu|in bujinkan)\b",
+        "",
+        cand,
+        flags=re.I,
+    ).strip()
     return cand
 
 def _candidate_variants(raw: str) -> List[str]:
