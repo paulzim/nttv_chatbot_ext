@@ -20,9 +20,11 @@ def test_hanbo_profile_uses_structured_fields():
     assert isinstance(ans, str) and ans.strip()
 
     low = ans.lower()
+    # Name + type description pulled from the structured reference
     assert "hanbo" in low or "hanbō" in low
-    assert "type:" in low
-    assert "core actions" in low
+    assert "short staff" in low
+    # And it should be using the CORE ACTIONS field
+    assert "core actions include" in low
 
 
 def test_kusari_fundo_profile_mentions_chain_and_core_actions():
@@ -32,5 +34,5 @@ def test_kusari_fundo_profile_mentions_chain_and_core_actions():
 
     low = ans.lower()
     assert "kusari" in low
-    assert "chain" in low
-    assert "core actions" in low
+    assert "chain" in low  # flexible chain weapon
+    assert "core actions include" in low
