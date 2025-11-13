@@ -803,6 +803,15 @@ def is_school_query(question: str) -> bool:
             return True
     return (" ryu" in ql) or (" ryū" in ql)
 
+def is_soke_query(q: str) -> bool:
+    ql = q.lower()
+    # cover accents and common phrasings
+    return any(token in ql for token in [
+        "soke", "sōke", "current soke", "who is the soke", "who is the sōke",
+        "grandmaster", "current grandmaster", "who is the grandmaster"
+    ])
+
+
 # ---------------------------
 # Core RAG pipeline
 # ---------------------------
@@ -828,6 +837,12 @@ def answer_with_rag(question: str, k: int = TOP_K) -> Tuple[str, List[Dict[str, 
     )
     if fast:
         return f"🔒 Strict (context-only, explain)\n\n{fast}", hits, '{"det_path":"technique/single"}'
+    
+    # --- Leadership (Sōke) gets priority over school profile if asked directly
+    if is_soke_query(question):
+        ans = try_leadership(question, hits)
+        if ans:
+            return ans, hits, {"det_path": "leadership/soke"}
 
     # 2.4) Schools LIST short-circuit
     if is_school_list_query(question):

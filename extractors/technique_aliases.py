@@ -1,48 +1,40 @@
 # extractors/technique_aliases.py
+from __future__ import annotations
 from typing import Dict, List
 
-# Canonical technique/kata names → common aliases (short forms, alt spellings)
-KATA_ALIASES: Dict[str, List[str]] = {
-    # Kihon Happo (Kosshi)
-    "Ichimonji no Kata": ["Ichimonji"],
-    "Hicho no Kata": ["Hicho", "Hichō"],
-    "Jumonji no Kata": ["Jumonji", "Jūmonji"],
+# Minimal alias map; extend freely.
+# Key = canonical technique name as it appears at the start of the MD line.
+TECH_ALIASES: Dict[str, List[str]] = {
+    # Wrist locks
+    "Omote Gyaku": ["omote gyaku", "forward wrist lock", "outer wrist lock"],
+    "Ura Gyaku": ["ura gyaku", "reverse wrist lock", "inside wrist lock"],
 
-    # Sanshin (often asked by short name)
-    "Chi no Kata": ["Chi"],
-    "Sui no Kata": ["Sui"],
-    "Ka no Kata": ["Ka"],
-    "Fu no Kata": ["Fu"],
-    "Ku no Kata": ["Ku"],
+    # Throws / controls (examples)
+    "Musha Dori": ["musha dori", "warrior capture"],
+    "Ganseki Nage": ["ganseki nage", "rock throw"],
 
-    # Common joint-locks & throws — include hyphen/spacing variants
-    "Omote Gyaku": ["Omote-Gyaku"],
-    "Ura Gyaku": ["Ura-Gyaku"],
-    "Musha Dori": ["Musha-Dori", "Musha-dori"],
-    "Ganseki Otoshi": ["Ganseki-Otoshi", "Ganseki-otoshi"],
+    # Kihon kata (examples)
+    "Jumonji no Kata": ["jumonji no kata", "jumonji", "cross form"],
+
+    # The one we’re fixing now:
+    "Oni Kudaki": ["oni kudaki", "ogre crusher", "demon crusher"],
+
+    # Add more as needed...
 }
 
-def expand_with_aliases(name: str) -> List[str]:
-    """
-    Given a candidate technique name, return a list of equivalent variants,
-    including short forms for '... no Kata' and known alias spellings.
-    """
-    name = (name or "").strip()
-    if not name:
-        return []
-
-    variants = {name}
-    # If user provided a short form, generate the '... no Kata' variant too
-    for canon, aliases in KATA_ALIASES.items():
-        if name == canon or name in aliases:
-            variants.add(canon)
-            variants.update(aliases)
-
-    # Also handle generic "... no Kata" <-> short form even if not in table
-    low = name.lower()
-    if low.endswith(" no kata"):
-        variants.add(name[:-8].strip())  # drop " no Kata"
-    else:
-        variants.add(f"{name} no Kata")
-
-    return list(dict.fromkeys(v for v in variants if v))  # de-dup preserve order
+def expand_with_aliases(q: str) -> List[str]:
+    """Return lowercased aliases that could match q."""
+    ql = q.lower().strip()
+    out: List[str] = []
+    for canon, aliases in TECH_ALIASES.items():
+        tokens = [canon.lower()] + [a.lower() for a in aliases]
+        if any(tok in ql for tok in tokens):
+            out.extend(tokens)
+    # de-dup while keeping order
+    seen = set()
+    uniq = []
+    for t in out:
+        if t not in seen:
+            seen.add(t)
+            uniq.append(t)
+    return uniq

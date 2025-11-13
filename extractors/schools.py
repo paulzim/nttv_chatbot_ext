@@ -133,6 +133,7 @@ def _parse_fields(block_lines: List[str]) -> Dict[str, str]:
             val = m.group(2).strip()
             data[key] = (data.get(key, "") + (" " if key in data and data[key] else "") + val).strip()
         else:
+            # continuation line (append to last seen key)
             if data:
                 last_key = list(data.keys())[-1]
                 data[last_key] = (data[last_key] + " " + ln.strip()).strip()
@@ -146,6 +147,7 @@ def _format_profile(canon: str, fields: Dict[str, str], bullets: bool) -> str:
             if k in fields:
                 parts.append(f"- {k.capitalize()}: {fields[k]}")
         return "\n".join(parts)
+
     segs = []
     if "translation" in fields:
         segs.append(f'“{fields["translation"]}”.')
@@ -170,6 +172,7 @@ def _collect_schools_blob(passages: List[Dict[str, Any]]) -> str:
             syn = 0 if "(synthetic)" in src else 1
             candidates.append((syn, -len(txt), txt))
         else:
+            # any doc that contains School: style headers
             if "school:" in _norm(txt):
                 candidates.append((1, -len(txt), txt))
     if not candidates:
@@ -209,15 +212,22 @@ def _infer_fields_from_freeblock(free_lines: List[str]) -> Dict[str, str]:
     data = _parse_fields(free_lines)
     if data:
         return data
+
     n = _norm(txt)
     inferred: Dict[str, str] = {}
+
+    # Type inference
     if any(k in n for k in ["ninpo", "ninjutsu"]):
         inferred["type"] = "Ninjutsu"
     elif any(k in n for k in ["kosshijutsu", "koppojutsu", "dakentaijutsu", "jutaijutsu", "samurai"]):
         inferred["type"] = "Samurai"
+
+    # Translation inference
     m = re.search(r'translation[: ]+["“](.+?)["”]', txt, flags=re.IGNORECASE)
     if m:
         inferred["translation"] = m.group(1).strip()
+
+    # Focus inference
     focus_terms = []
     for term in ["stealth", "infiltration", "surprise", "espionage", "distance", "timing", "kamae",
                  "kosshijutsu", "koppojutsu", "striking", "bone", "joint", "throws", "grappling",
@@ -226,13 +236,16 @@ def _infer_fields_from_freeblock(free_lines: List[str]) -> Dict[str, str]:
             focus_terms.append(term)
     if focus_terms:
         inferred["focus"] = ", ".join(sorted(set(focus_terms)))
+
+    # Weapons inference
     wterms = []
-    for term in ["shuriken", "kunai", "kodachi", "katana", "yari", "naginata", "bo", "hanbo",
-                 "kusarifundo", "kusari fundo", "kyoketsu shoge", "tessen", "jutte", "jitte"]:
+    for term in ["shuriken", "senban", "kunai", "kodachi", "katana", "yari", "naginata", "bo", "hanbo",
+                 "kusarifundo", "kusari fundo", "kyoketsu shoge", "kyoketsu-shoge", "tessen", "jutte", "jitte"]:
         if term in n:
             wterms.append(term)
     if wterms:
         inferred["weapons"] = ", ".join(sorted(set(wterms)))
+
     return inferred
 
 def _canon_from_header(header_line: str) -> Optional[str]:
@@ -258,14 +271,18 @@ def try_answer_schools_list(
     *,
     bullets: bool = True,
 ) -> Optional[str]:
+    """Return a list of the nine schools, if the question asks for the list."""
     if not is_school_list_query(question):
         return None
+
     blob = _collect_schools_blob(passages)
     if not blob.strip():
         return None
+
     blocks = _slice_school_blocks(blob)
     if not blocks:
         return None
+
     names: List[str] = []
     seen = set()
     for header, _ in blocks:
@@ -273,8 +290,11 @@ def try_answer_schools_list(
         if canon and canon not in seen:
             seen.add(canon)
             names.append(canon)
+
     if not names:
         return None
+
+    # Keep a stable/canonical order if we captured all nine
     canonical_order = [
         "Togakure Ryu",
         "Gyokushin Ryu",
@@ -289,6 +309,7 @@ def try_answer_schools_list(
     if set(n.lower() for n in names) >= set(n.lower() for n in canonical_order):
         order_map = {n.lower(): i for i, n in enumerate(canonical_order)}
         names.sort(key=lambda s: order_map.get(s.lower(), 999))
+
     title = "The Nine Schools of the Bujinkan"
     if bullets:
         out = [f"{title}:"]
@@ -303,13 +324,27 @@ def try_answer_school_profile(
     *,
     bullets: bool = True,
 ) -> Optional[str]:
+    """
+    Return a compact profile for a single school (Translation / Type / Focus / Weapons / Notes).
+
+    IMPORTANT: If the query looks like a sōke/grandmaster query, return None so the leadership
+    extractor can take over.
+    """
+    ql = _norm(question)
+    if any(k in ql for k in ["soke", "sōke", "grandmaster"]):
+        return None  # leadership extractor should handle lineage/holders
+
     canon = _canon_for_query(question)
     if not canon:
         return None
+
     blob = _collect_schools_blob(passages)
     if not blob.strip():
         return None
+
     blocks = _slice_school_blocks(blob)
+
+    # First try exact header match, then fuzzy containment
     fields: Optional[Dict[str, str]] = None
     if blocks:
         for header, body in blocks:
@@ -325,10 +360,14 @@ def try_answer_school_profile(
                     fields = _parse_fields(body)
                     if fields:
                         break
+
+    # Fallback: heuristic extraction from a nearby free block
     if not fields:
         window = _fallback_block_by_alias(blob, canon)
         if window:
             fields = _infer_fields_from_freeblock(window)
+
     if not fields:
         return None
+
     return _format_profile(canon, fields, bullets=bullets)

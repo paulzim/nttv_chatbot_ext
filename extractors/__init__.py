@@ -18,9 +18,9 @@ except Exception:
 
 # ----- Deterministic concept/technique extractors
 from .kyusho import try_answer_kyusho
-from .kihon_happo import try_answer_kihon_happo     # <— MUST be imported
+from .kihon_happo import try_answer_kihon_happo   # keep this before generic techniques
 from .techniques import try_answer_technique
-from .sanshin import try_answer_sanshin
+from .sanshin import try_answer_sanshin           # must accept (question, passages)
 
 # Leadership (Soke lookups)
 from .leadership import try_extract_answer as try_leadership
@@ -35,40 +35,50 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optiona
 
     # --- Rank-specific: Striking / Throws / Chokes
     ans = try_answer_rank_striking(question, passages)
-    if ans: return ans
+    if ans:
+        return ans
 
     ans = try_answer_rank_nage(question, passages)
-    if ans: return ans
+    if ans:
+        return ans
 
     ans = try_answer_rank_jime(question, passages)
-    if ans: return ans
+    if ans:
+        return ans
 
     # --- Rank-specific: Requirements (ENTIRE block for “requirements for X kyu”)
     ans = try_answer_rank_requirements(question, passages)
-    if ans: return ans
+    if ans:
+        return ans
 
     # --- Rank-specific: Weapons by rank (optional)
     ans = try_answer_rank_weapons(question, passages)
-    if ans: return ans
+    if ans:
+        return ans
 
     # --- Concept: Kyusho (short, deterministic)
     ans = try_answer_kyusho(question, passages)
-    if ans: return ans
+    if ans:
+        return ans
 
     # --- Kihon Happo (run BEFORE techniques so it wins over general technique matches)
     ans = try_answer_kihon_happo(question, passages)
-    if ans: return ans
+    if ans:
+        return ans
 
     # --- Techniques (Omote Gyaku, Musha Dori, Jumonji no Kata, etc.)
     ans = try_answer_technique(question, passages)
-    if ans: return ans
+    if ans:
+        return ans
 
     # --- Concept: Sanshin
     ans = try_answer_sanshin(question, passages)
-    if ans: return ans
+    if ans:
+        return ans
 
     # --- Leadership (Soke / headmaster)
     ans = try_leadership(question, passages)
-    if ans: return ans
+    if ans:
+        return ans
 
     return None
