@@ -87,3 +87,181 @@ TYPE: Short metal rod with a side hook, primarily for defense, particularly agai
 CORE ACTIONS: blocking, disarming, hooking, striking
 RANKS: Introduced at 3rd Kyu
 NOTES: Can be used to block and trap sword strikes, and as a baton to strike, disarm, or manipulate an opponent's joints.
+
+
+[WEAPON] Shuriken
+ALIASES: shuriken, bo-shuriken, hira-shuriken, senban, throwing spikes, throwing stars
+TYPE: Concealed throwing blades used for distraction, penetration, or close‑quarter striking
+CORE ACTIONS: throwing, flicking, cutting, distracting, concealed striking
+RANKS: Introduced at 3rd Kyu
+NOTES: Includes straight spikes (bo-shuriken), flat stars (hira-shuriken), and Togakure‑ryu senban. Used primarily to create openings, disrupt movement, or apply tactical pressure — not as a primary killing weapon. Can also be used in-hand as a concealed striking or gouging tool.
+
+
+
+---
+
+# Shuriken Throwing Basics
+## Source: Ninja Training TV | Reformatted for LLM Ingestion
+---
+
+## 📌 Section: Overview
+### Topic: Dual Use of Shuriken
+
+- There are two primary ways to use a shuriken:
+  - **Daken-jutsu (打剣術)** – Throwing techniques
+  - **Shoken-jutsu (掌剣術)** – Hand-to-hand techniques
+
+Both methods are based on the same context: a concealed blade (or object) is used in defense, either thrown or used in close combat.
+
+🎯 *Principle:* Train to be prepared for either application — throwing or striking — without reliance on circumstance.
+
+---
+
+## 📌 Section: Daken-jutsu
+### Topic: Throwing Techniques
+
+- **Definition**: The art of throwing an object — traditionally a blade, but can be anything.
+- **Improvised Weapons**: Pencil, chopstick, paintbrush, tool — anything small and throwable.
+- **Advantage**: Faster than drawing a weapon (e.g. sword, bow, firearm).
+
+#### 🧭 Functional Range
+- Effective range is up to **10 meters**.
+- Traditional practice limit: **3 tatami mats** distance = **sangen (三間)** ≈ **5.4 meters / 17 feet**.
+- Extended skill benchmarks:
+  - **Yongen (四間)** = ~7.2 meters / 22 feet
+  - **Goken (五間)** = ~9 meters / 29 feet
+
+#### 📏 Japanese Distance Terms
+| Term   | Meaning         | Approximate Distance     |
+|--------|------------------|--------------------------|
+| **Ken**     | 1 mat / 1 reach | ~1.8m / 6ft            |
+| **Sangen**  | 3 ken            | ~5.4m / 17ft           |
+| **Yongen**  | 4 ken            | ~7.2m / 22ft           |
+| **Goken**   | 5 ken            | ~9m / 29ft             |
+
+---
+
+## 📌 Section: Biomechanics
+### Topic: Throwing Motion
+
+- **Arm Mechanics**: Throwing = circular motion around shoulder. Shoulder is the fixed axis.
+- **Punching vs Throwing**:
+  - Punch = Linear force
+  - Throw = Rotational speed
+
+#### ✅ Throwing Form Guidelines
+1. Do **not** rely on straight extension (as in punching).
+2. Use full-body rotation for power.
+3. Ensure the wrist flick aligns with release for control.
+
+🧠 *Tip:* Think of the throw like casting a fishing rod — smooth arc, timed release.
+
+---
+
+## 📌 Section: Targeting & Practice
+### Topic: Effective Practice Habits
+
+- Practice throwing at consistent distances (Ken/Sangen/Yongen).
+- Track success by accuracy, penetration (if using real metal), and consistency.
+- Consider trajectory vs speed:
+  - Close = fast release
+  - Far = more arc and wrist control
+
+🎯 *Visualization:* Imagine a line extending from shoulder to target. The shuriken follows this path.
+
+---
+
+## 📌 Section: Shoken-jutsu
+### Topic: Close-Quarters Application
+
+- **Definition**: Using the shuriken in hand-to-hand combat.
+- Can function as a surprise striking tool (e.g., palm strike with metal edge).
+- Use like a yawara stick or pressure point implement.
+- Often concealed in palm or sleeve.
+
+⚠️ *Partner awareness essential — train with safe replicas.*
+
+---
+
+## 📌 Section: Training Mindset
+### Topic: Philosophy of Shuriken Use
+
+- A true ninja is ready to use any object in the environment as a weapon.
+- Shuriken should not be relied upon solely for combat, but as a tool of timing, deception, and disruption.
+- The mindset is not “I throw a weapon,” but rather “I use the moment.”
+
+🧘 *Zanshin* (残心) — Remaining mind/spirit — applies **after** the throw.
+
+---
+
+
+## 📌 Section: Types of Shuriken
+### Topic: Classification and Features
+
+Shuriken come in several forms, generally categorized into two main groups:
+
+---
+
+### 1. **Bo-Shuriken (棒手裏剣)**
+- **Shape**: Straight spike — like a needle, dart, or nail.
+- **Material**: Usually steel or iron.
+- **Size**: Typically 12–18 cm long (~5–7 inches).
+- **Throwing**: Usually single-spin (ken or sangen).
+- **Grip**: Thrown from the center or tail end.
+- **Ryu Examples**:
+  - Togakure-ryū used bo-shuriken hidden in the *sleeves* or *pant legs*.
+
+🛠 *Common shapes*: square, round, octagonal cross-section.
+
+---
+
+### 2. **Hira-Shuriken (平手裏剣)**
+- **Shape**: Flat, bladed — the classic “ninja star.”
+- **Blades**: Typically 4 to 8 points.
+- **Material**: Forged steel; sharpened on edges.
+- **Throwing**: More of a slicing rotation; good at short ranges.
+- **Grip**: Between the index and thumb; thrown in a flicking motion.
+
+⚠️ Often used for distraction, cutting skin, or applying toxins — not primary killing tools.
+
+---
+
+### 3. **Senban Shuriken (旋盤手裏剣)**
+- **Specific subtype** of hira-shuriken.
+- **Shape**: Four-pointed “square” star with sharp corners.
+- **Unique Use**: May be stuck in the ground for traps, or thrown edge-first.
+- **Historical Use**: Prominent in Togakure-ryū.
+
+---
+
+### 4. **Needle Shuriken / Hari-gata (針型手裏剣)**
+- **Shape**: Very thin needle-like; may resemble large sewing needles.
+- **Tactic**: Excellent for precise, stealthy insertion (e.g., behind the ear, through thin clothing).
+- **Often used with poison.**
+
+---
+
+### 5. **Modern Improvised Throwing Tools**
+- Chopsticks, pens, nails, allen wrenches, hex keys — anything can be trained as a shuriken if:
+  - It fits in the hand
+  - Is balanced or controllable
+  - Can pierce, distract, or strike with intent
+
+🥋 *Philosophy*: “Anything in the environment can be a tool of survival if your spirit is prepared.”
+
+---
+
+### 🧠 Practical Advice for Training
+| Type           | Range      | Rotation | Application       |
+|----------------|------------|----------|-------------------|
+| Bo-shuriken    | Mid-Long   | 1–2 spin | Penetration       |
+| Hira-shuriken  | Short      | Rapid    | Distraction, slice|
+| Senban         | Short      | Flat spin| Trap, utility     |
+| Improvised     | Varies     | N/A      | Training mindset  |
+
+---
+
+🧷 *Pro Tip:* Store shuriken safely in a cloth wrap or wooden container to avoid edge dulling or accidental injury.
+
+
+
