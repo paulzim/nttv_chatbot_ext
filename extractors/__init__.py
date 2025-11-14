@@ -46,6 +46,10 @@ from .nage_waza import try_answer_nage_waza
 # Gyaku waza
 from .gyaku_waza import try_answer_gyaku_waza
 
+# Etiquette
+from .etiquette import try_answer_etiquette
+
+
 
 
 
@@ -93,6 +97,11 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optiona
     if ans:
         return ans
     
+        # --- Concept: Sanshin no Kata
+    ans = try_answer_sanshin(question, passages)
+    if ans:
+        return ans
+    
     # --- Taihenjutsu (ukemi / rolls)
     ans = try_answer_taihenjutsu(question, passages)
     if ans:
@@ -116,16 +125,18 @@ def try_extract_answer(question: str, passages: List[Dict[str, Any]]) -> Optiona
     ans = try_answer_gyaku_waza(question, passages)
     if ans:
         return ans
+    
+    # --- Etiquette (bow-in, late, zanshin, dojo Japanese)
+    ans = try_answer_etiquette(question, passages)
+    if ans:
+        return ans
 
     # --- Single-technique definitions from Technique Descriptions.md
     ans = try_answer_technique(question, passages)
     if ans:
         return ans
 
-    # --- Concept: Sanshin no Kata
-    ans = try_answer_sanshin(question, passages)
-    if ans:
-        return ans
+
 
     # --- Leadership (Sōke / headmaster, shihan roles)
     ans = try_leadership(question, passages)

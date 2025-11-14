@@ -485,6 +485,20 @@ Zenpo Ukemi - Forward Breakfall
 
 
 
+# Counting in Japanese:
+
+Number 	Japanese
+1	いち (ichi)
+2	に (ni)
+3	さん (san)
+4	よん / し (yon / shi)
+5	ご (go)
+6	ろく (roku)
+7	なな / しち (nana / shichi)
+8	はち (hachi)
+9	きゅう / く (kyuu / ku)
+10	じゅう (juu)
+
 
 
 
