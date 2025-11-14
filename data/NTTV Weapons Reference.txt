@@ -89,15 +89,6 @@ RANKS: Introduced at 3rd Kyu
 NOTES: Can be used to block and trap sword strikes, and as a baton to strike, disarm, or manipulate an opponent's joints.
 
 
-[WEAPON] Shuriken
-ALIASES: shuriken, bo-shuriken, hira-shuriken, senban, throwing spikes, throwing stars
-TYPE: Concealed throwing blades used for distraction, penetration, or close‑quarter striking
-CORE ACTIONS: throwing, flicking, cutting, distracting, concealed striking
-RANKS: Introduced at 3rd Kyu
-NOTES: Includes straight spikes (bo-shuriken), flat stars (hira-shuriken), and Togakure‑ryu senban. Used primarily to create openings, disrupt movement, or apply tactical pressure — not as a primary killing weapon. Can also be used in-hand as a concealed striking or gouging tool.
-
-
-
 ---
 
 # Shuriken Throwing Basics
