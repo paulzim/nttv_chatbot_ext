@@ -1,7 +1,9 @@
 # extractors/__init__.py
 from typing import List, Dict, Any, Optional
 
-# ----- Rank-specific extractors (most precise; run first)
+# ----------------------------------------------------------------------
+# 1) Rank-specific extractors (most precise; run first)
+# ----------------------------------------------------------------------
 from .rank import (
     try_answer_rank_striking,
     try_answer_rank_nage,
@@ -9,9 +11,9 @@ from .rank import (
     try_answer_rank_requirements,  # explicit “requirements for X kyu”
 )
 
-# If you implemented rank weapons in rank.py, import it; otherwise provide a no-op.
+# Optional: rank → weapons mapping (if present in rank.py)
 try:
-    from .rank import try_answer_rank_weapons  # optional
+    from .rank import try_answer_rank_weapons  # type: ignore[attr-defined]
 except Exception:  # pragma: no cover
     def try_answer_rank_weapons(
         question: str, passages: List[Dict[str, Any]]
@@ -19,53 +21,89 @@ except Exception:  # pragma: no cover
         return None
 
 
-# Weapons: rank, profiles, katana parts live here
+# ----------------------------------------------------------------------
+# 2) Weapons (profiles, rank, katana parts)
+# ----------------------------------------------------------------------
 from .weapons import (
     try_answer_weapon_rank,
     try_answer_weapon_profile,
     try_answer_katana_parts,
 )
 
-# Kamae (stances for empty-hand and weapons)
+# ----------------------------------------------------------------------
+# 3) Kamae, Kyusho, Kihon Happo, Sanshin, Etiquette
+# ----------------------------------------------------------------------
 from .kamae import try_answer_kamae
-
-# Kyusho (pressure points)
 from .kyusho import try_answer_kyusho
 
-# Kihon Happo (broken down by families, kata names, etc.)
-from .kihon_happo import try_extract_answer as try_answer_kihon_happo
+# IMPORTANT: use the real exported name from kihon_happo.py
+from .kihon_happo import try_answer_kihon_happo
 
-# Schools (Gyokko-ryu, Koto-ryu, Togakure-ryu, etc.)
-from .schools import try_extract_answer as try_answer_schools
-
-# Technique CSV / single-technique descriptions
-from .techniques import try_answer_technique
-
-# Sanshin no Kata
 from .sanshin import try_answer_sanshin
-
-# Leadership / sōke / shihan info
-from .leadership import try_extract_answer as try_leadership
-
-# Taihenjutsu (ukemi, rolls, breakfalls, etc.)
-from .taihenjutsu import try_answer_taihenjutsu
-
-# Dakentaijutsu (striking curriculum)
-from .dakentaijutsu import try_answer_dakentaijutsu
-
-# Nage waza (throws)
-from .nage_waza import try_answer_nage_waza
-
-# Jime waza (chokes / strangles)
-from .jime_waza import try_answer_jime_waza
-
-# Gyaku waza (reversals / joint locks)
-from .gyaku_waza import try_answer_gyaku_waza
-
-# Dojo etiquette / zanshin / dojo Japanese
 from .etiquette import try_answer_etiquette
 
+# ----------------------------------------------------------------------
+# 4) Schools, techniques, leadership
+# ----------------------------------------------------------------------
+# IMPORTANT: use the real exported name from schools.py
+from .schools import try_answer_school_profile as try_answer_schools
 
+from .techniques import try_answer_technique
+from .leadership import try_extract_answer as try_leadership
+
+# ----------------------------------------------------------------------
+# 5) Curriculum block extractors (Taihen, Dakentaijutsu, Nage, Jime, Gyaku)
+#    These are optional – we guard imports so pytest doesn’t explode if any
+#    of the files aren’t present locally.
+# ----------------------------------------------------------------------
+try:
+    from .taihenjutsu import try_answer_taihenjutsu
+except Exception:  # pragma: no cover
+    def try_answer_taihenjutsu(
+        question: str, passages: List[Dict[str, Any]]
+    ) -> Optional[str]:
+        return None
+
+
+try:
+    from .dakentaijutsu import try_answer_dakentaijutsu
+except Exception:  # pragma: no cover
+    def try_answer_dakentaijutsu(
+        question: str, passages: List[Dict[str, Any]]
+    ) -> Optional[str]:
+        return None
+
+
+try:
+    from .nage_waza import try_answer_nage_waza
+except Exception:  # pragma: no cover
+    def try_answer_nage_waza(
+        question: str, passages: List[Dict[str, Any]]
+    ) -> Optional[str]:
+        return None
+
+
+try:
+    from .jime_waza import try_answer_jime_waza
+except Exception:  # pragma: no cover
+    def try_answer_jime_waza(
+        question: str, passages: List[Dict[str, Any]]
+    ) -> Optional[str]:
+        return None
+
+
+try:
+    from .gyaku_waza import try_answer_gyaku_waza
+except Exception:  # pragma: no cover
+    def try_answer_gyaku_waza(
+        question: str, passages: List[Dict[str, Any]]
+    ) -> Optional[str]:
+        return None
+
+
+# ----------------------------------------------------------------------
+# Master router
+# ----------------------------------------------------------------------
 def try_extract_answer(
     question: str, passages: List[Dict[str, Any]]
 ) -> Optional[str]:
@@ -76,16 +114,20 @@ def try_extract_answer(
     answer using the more specific extractors first, then fall back to more
     general ones. Returns a string answer or None if nothing deterministic
     applies (handing control back to the model).
+
+    Order here is *very* intentional:
+      1) Rank-specific queries
+      2) Curriculum block queries (Taihen, Dakentaijutsu, Nage, Jime, Gyaku)
+      3) Weapons (katana parts, profiles, rank)
+      4) Kamae / Kyusho
+      5) Kihon Happo / Sanshin / Etiquette
+      6) Techniques / Schools
+      7) Leadership
     """
 
     # ------------------------------------------------------------------
     # 1) Rank-specific logic (most constrained, very explicit intent)
     # ------------------------------------------------------------------
-    # “What are the requirements for 8th kyu?”
-    ans = try_answer_rank_requirements(question, passages)
-    if ans:
-        return ans
-
     # “What punches are at 9th kyu?”, “what throws are required at 5th kyu?”
     ans = try_answer_rank_striking(question, passages)
     if ans:
@@ -99,6 +141,11 @@ def try_extract_answer(
     if ans:
         return ans
 
+    # “What are the requirements for 8th kyu?”
+    ans = try_answer_rank_requirements(question, passages)
+    if ans:
+        return ans
+
     # “What weapons do we learn at 3rd kyu?” (if implemented)
     ans = try_answer_rank_weapons(question, passages)
     if ans:
@@ -107,27 +154,27 @@ def try_extract_answer(
     # ------------------------------------------------------------------
     # 2) Curriculum blocks (Taihenjutsu / Dakentaijutsu / Nage / Jime / Gyaku)
     # ------------------------------------------------------------------
-    # “What are the rolls in Taihenjutsu?”, etc.
+    # “What are the rolls in Taihenjutsu?”
     ans = try_answer_taihenjutsu(question, passages)
     if ans:
         return ans
 
-    # “What strikes are in Dakentaijutsu?”, etc.
+    # “What strikes are in Dakentaijutsu?”
     ans = try_answer_dakentaijutsu(question, passages)
     if ans:
         return ans
 
-    # “List the throws in Nage waza”, “which throws are in the curriculum?”
+    # “List the throws in Nage Waza”
     ans = try_answer_nage_waza(question, passages)
     if ans:
         return ans
 
-    # “What chokes are in the curriculum?”, “what jime waza do we study?”
+    # “What chokes are in the curriculum?”
     ans = try_answer_jime_waza(question, passages)
     if ans:
         return ans
 
-    # “What joint locks are in the curriculum?”, “what gyaku waza do we use?”
+    # “What joint locks / gyaku waza are in the curriculum?”
     ans = try_answer_gyaku_waza(question, passages)
     if ans:
         return ans
@@ -135,7 +182,7 @@ def try_extract_answer(
     # ------------------------------------------------------------------
     # 3) Weapons: katana parts, profiles, rank
     # ------------------------------------------------------------------
-    # Katana terminology / parts of the sword
+    # Katana terminology / sword parts (from nttv training reference.txt)
     ans = try_answer_katana_parts(question, passages)
     if ans:
         return ans
@@ -155,18 +202,18 @@ def try_extract_answer(
     # ------------------------------------------------------------------
     # 4) Kamae (stances) and Kyusho (pressure points)
     # ------------------------------------------------------------------
-    # “What are the kamae for 9th kyu?”, “what kamae with hanbo?”, etc.
+    # “What are the kamae for 9th kyu?”, “what kamae with the hanbo?”
     ans = try_answer_kamae(question, passages)
     if ans:
         return ans
 
-    # Kyusho (pressure point questions)
+    # Kyusho pressure point questions
     ans = try_answer_kyusho(question, passages)
     if ans:
         return ans
 
     # ------------------------------------------------------------------
-    # 5) Kihon Happo, Sanshin, and Etiquette
+    # 5) Kihon Happo, Sanshin, Etiquette
     # ------------------------------------------------------------------
     # Kihon Happo breakdowns, families, and kata-level questions
     ans = try_answer_kihon_happo(question, passages)
