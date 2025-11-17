@@ -8,6 +8,10 @@ This is intentionally conservative and only kicks in when:
 It reads from:
 - Retrieved passages whose source is "Glossary - edit.txt", and/or
 - The on-disk Glossary file if present (../data/Glossary - edit.txt).
+
+It also performs a disambiguation step:
+- If the query clearly looks like a technique/kata name, the glossary backs off
+  and returns None so technique / rank extractors (or the LLM) can answer.
 """
 
 from __future__ import annotations
@@ -17,6 +21,10 @@ import re
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 
+
+# ----------------------------------------------------------------------
+# Basic helpers
+# ----------------------------------------------------------------------
 
 def _fold(s: str) -> str:
     """Lowercase, collapse whitespace, strip basic punctuation."""
@@ -48,6 +56,10 @@ def _looks_like_glossary_question(question: str) -> bool:
         return True
     return False
 
+
+# ----------------------------------------------------------------------
+# Glossary loading & parsing
+# ----------------------------------------------------------------------
 
 def _load_full_glossary_file() -> str:
     """Try to read the full Glossary file from disk (if available)."""
@@ -175,9 +187,105 @@ def _choose_glossary_entry(
     return None
 
 
+# ----------------------------------------------------------------------
+# Technique / kata disambiguation
+# ----------------------------------------------------------------------
+
+_TECH_NAME_HINTS = [
+    "gyaku", "kudaki", "dori", "gatame", "otoshi", "nage",
+    "seoi", "kote", "musha", "juji", "kaiten", "gake", "ori",
+]
+
+
+def _gather_technique_text(passages: List[Dict[str, Any]]) -> str:
+    """Collect Technique Descriptions text from retrieved passages."""
+    chunks: List[str] = []
+    for p in passages:
+        src_raw = p.get("source") or ""
+        if _same_source_name(src_raw, "Technique Descriptions.md") or "technique descriptions" in src_raw.lower():
+            txt = p.get("text", "")
+            if txt:
+                chunks.append(txt)
+    return "\n".join(chunks)
+
+
+def _extract_technique_names(md_text: str) -> set[str]:
+    """Extract technique names (first CSV column) from Technique Descriptions.md."""
+    names: set[str] = set()
+    for raw in (md_text or "").splitlines():
+        st = raw.strip()
+        if not st:
+            continue
+        if st.startswith("#") or st.startswith("```"):
+            continue
+        if "," not in raw:
+            continue
+        first = raw.split(",", 1)[0].strip()
+        if first:
+            names.add(_fold(first))
+    return names
+
+
+def _looks_like_technique_term(question: str, passages: List[Dict[str, Any]]) -> bool:
+    """
+    Return True if the question appears to be about a specific technique/kata.
+
+    This has two layers:
+    1) Pure heuristic: words like 'kudaki', 'gyaku', 'dori', 'nage', 'kata', 'waza'
+       strongly suggest a technique/kata and are enough to make the glossary back off.
+    2) Data-aware: if Technique Descriptions are present and the candidate matches
+       a known technique name, also back off.
+    """
+    q = _fold(question)
+
+    # Strong kata/waza indicators
+    if " no kata" in q or "kata" in q or "waza" in q:
+        return True
+
+    # Name-pattern hints (Oni Kudaki, Omote Gyaku, Musha Dori, etc.)
+    if any(h in q for h in _TECH_NAME_HINTS):
+        return True
+
+    # Data-aware check using Technique Descriptions (if available)
+    cand = _fold(_extract_candidate(question))
+    if len(cand) < 3:
+        return False
+
+    md_text = _gather_technique_text(passages)
+    if not md_text.strip():
+        return False
+
+    names = _extract_technique_names(md_text)
+    if not names:
+        return False
+
+    # Exact match to a technique name
+    if cand in names:
+        return True
+
+    # Try last 1–2 words (e.g., "oni kudaki", "koku")
+    tokens = cand.split()
+    for span in (2, 1):
+        if len(tokens) >= span:
+            sub = " ".join(tokens[-span:])
+            if sub in names:
+                return True
+
+    return False
+
+
+# ----------------------------------------------------------------------
+# Public API
+# ----------------------------------------------------------------------
+
 def try_answer_glossary(question: str, passages: List[Dict[str, Any]]) -> Optional[str]:
     """Glossary-based fallback definition for single-term style questions."""
     if not _looks_like_glossary_question(question):
+        return None
+
+    # Disambiguation: if this clearly looks like a technique/kata, let the
+    # technique/rank extractors (or LLM) answer instead.
+    if _looks_like_technique_term(question, passages):
         return None
 
     text = _gather_glossary_text(passages)
