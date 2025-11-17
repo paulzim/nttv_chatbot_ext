@@ -10,6 +10,7 @@ This module parses **NTTV Weapons Reference.txt** style blocks and can answer:
 """
 from __future__ import annotations
 
+import os
 import re
 from typing import List, Dict, Any, Optional
 
@@ -65,16 +66,33 @@ SHURIKEN_TYPES_TEXT = (
 # ----------------------------
 
 def _norm(text: str) -> str:
-    return text.lower().strip()
+    return (text or "").lower().strip()
+
+
+def _same_source_name(p_source: str, target_name: str) -> bool:
+    """
+    Compare a passage 'source' (which may be a full path) to a logical
+    filename like 'NTTV Weapons Reference.txt', using basenames + lowercase.
+
+    This makes the extractor robust to FAISS/meta storing 'data/NTTV Weapons Reference.txt'
+    or similar, while tests can still use the plain filename.
+    """
+    if not p_source:
+        return False
+    base_actual = _norm(os.path.basename(p_source))
+    base_target = _norm(os.path.basename(target_name))
+    return base_actual == base_target
 
 
 def _join_passages_text(passages: List[Dict[str, Any]], source_name: str) -> str:
-    """Concatenate text from all passages matching a given source."""
+    """Concatenate text from all passages matching a given source (by basename)."""
     chunks: List[str] = []
     for p in passages:
-        if _norm(p.get("source", "")) == _norm(source_name):
+        src = p.get("source", "")
+        if _same_source_name(src, source_name):
             t = p.get("text") or ""
-            chunks.append(t)
+            if t:
+                chunks.append(t)
     return "\n".join(chunks)
 
 

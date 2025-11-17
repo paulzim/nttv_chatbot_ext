@@ -22,9 +22,17 @@ except Exception:  # pragma: no cover - fallback in case rank weapons isn't impl
 # ----- Weapon profiles (Hanbo, Kusari Fundo, Katana, Shuriken types, etc.)
 # These work off NTTV Weapons Reference.txt and related sources.
 try:
-    from .weapons import try_answer_weapon_profile  # type: ignore[attr-defined]
+    from .weapons import (
+        try_answer_weapon_profile,   # type: ignore[attr-defined]
+        try_answer_katana_parts,     # specific "parts of the katana" handler
+    )
 except Exception:  # pragma: no cover
     def try_answer_weapon_profile(
+        question: str, passages: List[Dict[str, Any]]
+    ) -> Optional[str]:
+        return None
+
+    def try_answer_katana_parts(
         question: str, passages: List[Dict[str, Any]]
     ) -> Optional[str]:
         return None
@@ -69,6 +77,11 @@ def try_extract_answer(
 
     # --- Rank-specific: Weapons by rank (optional)
     ans = try_answer_rank_weapons(question, passages)
+    if ans:
+        return ans
+
+    # --- Katana parts (very specific intent: parts/terminology of the katana)
+    ans = try_answer_katana_parts(question, passages)
     if ans:
         return ans
 
