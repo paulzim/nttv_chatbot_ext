@@ -23,8 +23,8 @@ except Exception:  # pragma: no cover - fallback in case rank weapons isn't impl
 # These work off NTTV Weapons Reference.txt and related sources.
 try:
     from .weapons import (
-        try_answer_weapon_profile,   # type: ignore[attr-defined]
-        try_answer_katana_parts,     # specific "parts of the katana" handler
+        try_answer_weapon_profile,   # weapon overview (hanbo, katana, etc.)
+        try_answer_katana_parts,     # special case: parts of the katana
     )
 except Exception:  # pragma: no cover
     def try_answer_weapon_profile(
@@ -46,6 +46,15 @@ from .sanshin import try_answer_sanshin           # must accept (question, passa
 
 # Leadership (Soke lookups)
 from .leadership import try_extract_answer as try_leadership
+
+# Glossary fallback (single-term / definition questions)
+try:
+    from .glossary import try_answer_glossary
+except Exception:  # pragma: no cover
+    def try_answer_glossary(
+        question: str, passages: List[Dict[str, Any]]
+    ) -> Optional[str]:
+        return None
 
 
 def try_extract_answer(
@@ -114,6 +123,11 @@ def try_extract_answer(
 
     # --- Leadership (Soke / headmaster)
     ans = try_leadership(question, passages)
+    if ans:
+        return ans
+
+    # --- Glossary fallback (single-term Ninjutsu/Bujinkan terms)
+    ans = try_answer_glossary(question, passages)
     if ans:
         return ans
 

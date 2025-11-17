@@ -1,4 +1,5 @@
 # extractors/leadership.py
+import os
 import re
 from typing import List, Dict, Any, Optional
 
@@ -43,6 +44,17 @@ def _strip_macrons(s: str) -> str:
              .replace("Ū", "U")
              .replace("Ā", "A")
              .replace("Ī", "I"))
+
+def _same_source_name(p_source: str, target_name: str) -> bool:
+    """
+    Compare FAISS/meta 'source' values (which may include paths) with the
+    logical filename used by the extractor. Basename + lowercase.
+    """
+    if not p_source:
+        return False
+    base_actual = os.path.basename(p_source).lower()
+    base_target = os.path.basename(target_name).lower()
+    return base_actual == base_target
 
 def _just_school_ryu(s: str) -> str:
     """
@@ -145,8 +157,9 @@ def _aggregate_leadership_text(passages: List[Dict[str, Any]]) -> str:
     """Concatenate ALL chunks from the leadership file so chunk boundaries don't hide lines."""
     blobs = []
     for p in passages:
-        src = (p.get("source") or "").lower()
-        if "leadership" in src:
+        src_raw = p.get("source") or ""
+        src = src_raw.lower()
+        if _same_source_name(src_raw, "Bujinkan Leadership and Wisdom.txt") or "leadership" in src:
             t = p.get("text") or ""
             if t:
                 blobs.append(t)

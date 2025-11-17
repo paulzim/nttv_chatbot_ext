@@ -1,7 +1,7 @@
-# extractors/rank.py
 from __future__ import annotations
 from typing import List, Dict, Any, Optional
 import re
+import os
 
 # ============================================================
 # Small, safe helpers (keep behavior stable)
@@ -29,6 +29,17 @@ def _dedup(seq: List[str]) -> List[str]:
             out.append(s_n)
             seen.add(k)
     return out
+
+def _same_source_name(p_source: str, target_name: str) -> bool:
+    """
+    Compare FAISS/meta 'source' values (which may include paths) with the
+    logical filename used by the extractor. Basename + lowercase.
+    """
+    if not p_source:
+        return False
+    base_actual = os.path.basename(p_source).lower()
+    base_target = os.path.basename(target_name).lower()
+    return base_actual == base_target
 
 # ============================================================
 # Alias tables for nicer display (kicks + punches)
@@ -113,9 +124,9 @@ def _rank_key_from_question(q: str) -> Optional[str]:
 def _find_rank_text_from_passages(passages: List[Dict[str, Any]]) -> Optional[str]:
     # Prefer explicitly injected rank requirements
     for p in passages:
-        src = (p.get("source") or p.get("meta", {}).get("source") or "").lower()
+        src = (p.get("source") or p.get("meta", {}).get("source") or "")
         text = p.get("text", "")
-        if text and "nttv rank requirements" in src:
+        if text and (_same_source_name(src, "nttv rank requirements.txt") or "nttv rank requirements" in src.lower()):
             return text
     # Fallback: any chunk that clearly looks like a rank document
     for p in passages:

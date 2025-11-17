@@ -1,7 +1,7 @@
-# extractors/schools.py
 from __future__ import annotations
 from typing import List, Dict, Any, Optional, Tuple
 import re
+import os
 
 # ----------------------------
 # Canonical names + aliases
@@ -57,6 +57,17 @@ def _norm(s: str) -> str:
     s = s.replace("–", "-").replace("—", "-")
     s = re.sub(r"\s+", " ", s)
     return s.strip().lower()
+
+def _same_source_name(p_source: str, target_name: str) -> bool:
+    """
+    Compare FAISS/meta 'source' values (which may include paths) with the
+    logical filename used by the extractor. Basename + lowercase.
+    """
+    if not p_source:
+        return False
+    base_actual = os.path.basename(p_source).lower()
+    base_target = os.path.basename(target_name).lower()
+    return base_actual == base_target
 
 def _looks_like_school_header(line: str) -> bool:
     t = _norm(line)
@@ -164,11 +175,12 @@ def _format_profile(canon: str, fields: Dict[str, str], bullets: bool) -> str:
 def _collect_schools_blob(passages: List[Dict[str, Any]]) -> str:
     candidates: List[Tuple[int, int, str]] = []  # (syn_flag, -len, text)
     for p in passages:
-        src = (p.get("source") or "").lower()
+        src_raw = p.get("source") or ""
+        src = src_raw.lower()
         txt = (p.get("text") or "").strip()
         if not txt:
             continue
-        if "schools of the bujinkan summaries" in src:
+        if _same_source_name(src_raw, "Schools of the Bujinkan Summaries.txt") or "schools of the bujinkan summaries" in src:
             syn = 0 if "(synthetic)" in src else 1
             candidates.append((syn, -len(txt), txt))
         else:

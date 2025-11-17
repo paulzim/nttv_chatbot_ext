@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import re
 import unicodedata
 from difflib import SequenceMatcher
@@ -43,6 +44,17 @@ def _lite(s: str) -> str:
     """Alnum only for tolerant matching."""
     return re.sub(r"[^a-z0-9]+", "", _fold(s))
 
+def _same_source_name(p_source: str, target_name: str) -> bool:
+    """
+    Compare FAISS/meta 'source' values (which may include paths) with the
+    logical filename used by the extractor. Basename + lowercase.
+    """
+    if not p_source:
+        return False
+    base_actual = os.path.basename(p_source).lower()
+    base_target = os.path.basename(target_name).lower()
+    return base_actual == base_target
+
 def _looks_like_technique_q(q: str) -> bool:
     ql = _norm_space(q).lower()
     if any(b in ql for b in CONCEPT_BANS):
@@ -58,8 +70,9 @@ def _gather_full_technique_text(passages: List[Dict[str, Any]]) -> str:
     """Concatenate only Technique Descriptions docs."""
     buf = []
     for p in passages:
-        src = (p.get("source") or "").lower()
-        if "technique descriptions" in src:
+        src_raw = p.get("source") or ""
+        src = src_raw.lower()
+        if _same_source_name(src_raw, "Technique Descriptions.md") or "technique descriptions" in src:
             buf.append(p.get("text", ""))
     return "\n".join(buf)
 
@@ -313,7 +326,7 @@ def try_answer_technique(question: str, passages: List[Dict[str, Any]]) -> Optio
             cq = _fold(cand_raw)
             best_name, best_score = None, 0.0
             for name in by_name.keys():
-                s = SequenceMatcher(None, cq, _fold(name)).ratio()
+                s = SequenceMatcher(None, _fold(name), cq).ratio()
                 if s > best_score:
                     best_name, best_score = name, s
             if best_name and best_score >= 0.80:

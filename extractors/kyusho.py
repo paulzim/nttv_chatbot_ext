@@ -7,6 +7,7 @@
 #     * a concise list of points when explicitly asked to list them.
 
 from __future__ import annotations
+import os
 import re
 import unicodedata
 from pathlib import Path
@@ -22,6 +23,18 @@ def _fold(s: str) -> str:
     s = unicodedata.normalize("NFKD", s)
     s = "".join(ch for ch in s if not unicodedata.combining(ch))
     return s.lower()
+
+
+def _same_source_name(p_source: str, target_name: str) -> bool:
+    """
+    Compare FAISS/meta 'source' values (which may include paths) with the
+    logical filename used by the extractor. Basename + lowercase.
+    """
+    if not p_source:
+        return False
+    base_actual = os.path.basename(p_source).lower()
+    base_target = os.path.basename(target_name).lower()
+    return base_actual == base_target
 
 
 def _looks_like_kyusho_question(question: str) -> bool:
@@ -65,8 +78,9 @@ def _gather_kyusho_text(passages: List[Dict[str, Any]]) -> str:
     """
     buf: List[str] = []
     for p in passages:
-        src = _fold(p.get("source") or "")
-        if "kyusho" in src:
+        src_raw = p.get("source") or ""
+        src_fold = _fold(src_raw)
+        if _same_source_name(src_raw, "KYUSHO.txt") or "kyusho" in src_fold:
             buf.append(p.get("text", ""))
 
     full_file = _load_full_kyusho_file()
