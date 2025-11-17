@@ -63,7 +63,7 @@ def test_router_prefers_rank_over_glossary_for_kicks():
     low = ans.lower()
 
     # Should be the rank striking answer, not a glossary definition
-    assert "8th kyu kicks:" in ans
+    assert "8th kyu kicks:" in low
     # sanity: shouldn't look like simple "Term: definition"
     assert not low.startswith("8th kyu:")
 

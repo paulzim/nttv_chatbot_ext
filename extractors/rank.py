@@ -400,3 +400,74 @@ def try_answer_rank_requirements(question: str, passages: List[Dict[str, Any]]) 
         return header_line
 
     return f"{header_line}\n" + "\n".join(sections)
+
+
+def try_answer_rank_kihon_kata(
+    question: str, passages: List[Dict[str, Any]]
+) -> Optional[str]:
+    """
+    Answer: Kihon Happo kata required at a specific rank.
+
+    Example intents:
+      - "Which Kihon Happo kata are required for 8th kyu?"
+      - "What Kihon Happo do I need to know for 7th kyu?"
+    """
+    ql = _lc(question)
+    if not (("kihon happo" in ql) or ("kihon" in ql and "happo" in ql)):
+        return None
+
+    rank_key = _rank_key_from_question(question)
+    if not rank_key:
+        return None
+
+    rank_text = _find_rank_text_from_passages(passages)
+    if not rank_text:
+        return None
+
+    block = _extract_rank_block(rank_text, rank_key)
+    if not block:
+        return None
+
+    lines = _extract_section_lines(block, "Kihon Happo:")
+    items = _dedup(_split_items(lines))
+    if not items:
+        return None
+
+    header = _norm(f"{rank_key} Kihon Happo kata:")
+    return f"{header} {_join_human(items)}"
+
+
+def try_answer_rank_sanshin_kata(
+    question: str, passages: List[Dict[str, Any]]
+) -> Optional[str]:
+    """
+    Answer: Sanshin / San Shin no Kata required at a specific rank.
+
+    Example intents:
+      - "What Sanshin no Kata do I need for 8th kyu?"
+      - "Which San Shin no Kata are required for 8th kyu?"
+    """
+    ql = _lc(question)
+    if not any(key in ql for key in ["sanshin", "san shin"]):
+        return None
+
+    rank_key = _rank_key_from_question(question)
+    if not rank_key:
+        return None
+
+    rank_text = _find_rank_text_from_passages(passages)
+    if not rank_text:
+        return None
+
+    block = _extract_rank_block(rank_text, rank_key)
+    if not block:
+        return None
+
+    lines = _extract_section_lines(block, "San Shin no Kata:")
+    items = _dedup(_split_items(lines))
+    if not items:
+        return None
+
+    # Keep the label spelling aligned with the source document.
+    header = _norm(f"{rank_key} San Shin no Kata:")
+    return f"{header} {_join_human(items)}"

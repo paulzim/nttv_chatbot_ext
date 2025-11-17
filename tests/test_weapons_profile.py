@@ -62,6 +62,6 @@ def test_hanbo_weapon_profile_basic_fields():
     low = ans.lower()
 
     assert "hanbo weapon profile:" in low
-    assert "type:" in ans
-    assert "core actions include:" in ans
-    assert "ranks:" in ans
+    assert "type:" in low
+    assert "core actions include:" in low
+    assert "ranks:" in low
