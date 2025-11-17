@@ -471,3 +471,100 @@ def try_answer_rank_sanshin_kata(
     # Keep the label spelling aligned with the source document.
     header = _norm(f"{rank_key} San Shin no Kata:")
     return f"{header} {_join_human(items)}"
+
+
+def try_answer_rank_ukemi(
+    question: str, passages: List[Dict[str, Any]]
+) -> Optional[str]:
+    """
+    Answer: Ukemi / rolls & breakfalls required at a specific rank.
+
+    Example intents:
+      - "What ukemi do I need to know for 9th kyu?"
+      - "What rolls and breakfalls are required for 9th kyu?"
+    """
+    ql = _lc(question)
+    if not any(w in ql for w in ["ukemi", "roll", "rolls", "breakfall", "breakfalls"]):
+        return None
+
+    rank_key = _rank_key_from_question(question)
+    if not rank_key:
+        return None
+
+    rank_text = _find_rank_text_from_passages(passages)
+    if not rank_text:
+        return None
+
+    block = _extract_rank_block(rank_text, rank_key)
+    if not block:
+        return None
+
+    lines = _extract_section_lines(block, "Ukemi:")
+    items = _dedup(_split_items(lines))
+    if not items:
+        return None
+
+    # Normalize capitalization for header (avoid “8Th”)
+    def _title_rank(s: str) -> str:
+        s = _norm(s)
+        m = re.match(r"(\d+)(st|nd|rd|th)\s+kyu", s, flags=re.IGNORECASE)
+        if not m:
+            return s
+        num = m.group(1)
+        last = num[-1]
+        if num.endswith("11") or num.endswith("12") or num.endswith("13"):
+            suffix = "th"
+        else:
+            suffix = {"1": "st", "2": "nd", "3": "rd"}.get(last, "th")
+        return f"{int(num)}{suffix} Kyu"
+
+    header = f"{_title_rank(rank_key)} ukemi (rolls and breakfalls):"
+    return f"{header} {_join_human(items)}"
+
+
+def try_answer_rank_taihenjutsu(
+    question: str, passages: List[Dict[str, Any]]
+) -> Optional[str]:
+    """
+    Answer: Taihenjutsu / body movement required at a specific rank.
+
+    Example intents:
+      - "What taihenjutsu do I need for 9th kyu?"
+      - "What Tai Sabaki is required for 9th kyu?"
+    """
+    ql = _lc(question)
+    if not any(w in ql for w in ["taihen", "taihenjutsu", "tai sabaki"]):
+        return None
+
+    rank_key = _rank_key_from_question(question)
+    if not rank_key:
+        return None
+
+    rank_text = _find_rank_text_from_passages(passages)
+    if not rank_text:
+        return None
+
+    block = _extract_rank_block(rank_text, rank_key)
+    if not block:
+        return None
+
+    lines = _extract_section_lines(block, "Taihenjutsu:")
+    items = _dedup(_split_items(lines))
+    if not items:
+        return None
+
+    def _title_rank(s: str) -> str:
+        s = _norm(s)
+        m = re.match(r"(\d+)(st|nd|rd|th)\s+kyu", s, flags=re.IGNORECASE)
+        if not m:
+            return s
+        num = m.group(1)
+        last = num[-1]
+        if num.endswith("11") or num.endswith("12") or num.endswith("13"):
+            suffix = "th"
+        else:
+            suffix = {"1": "st", "2": "nd", "3": "rd"}.get(last, "th")
+        return f"{int(num)}{suffix} Kyu"
+
+    header = f"{_title_rank(rank_key)} Taihenjutsu (body movement):"
+    return f"{header} {_join_human(items)}"

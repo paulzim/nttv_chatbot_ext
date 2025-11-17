@@ -1,4 +1,5 @@
 # extractors/__init__.py
+
 from typing import List, Dict, Any, Optional
 
 # ----- Rank-specific extractors (most precise; run first)
@@ -6,18 +7,18 @@ from .rank import (
     try_answer_rank_striking,
     try_answer_rank_nage,
     try_answer_rank_jime,
+    try_answer_rank_ukemi,
+    try_answer_rank_taihenjutsu,
+    try_answer_rank_kihon_kata,
+    try_answer_rank_sanshin_kata,
     try_answer_rank_requirements,   # explicit "requirements for X kyu"
-    try_answer_rank_kihon_kata,    # Kihon Happo kata by rank
-    try_answer_rank_sanshin_kata,  # San Shin / Sanshin no Kata by rank
 )
 
-# If you implemented rank weapons in rank.py, import it; otherwise provide a no-op.
+# Optional: rank→weapons mapping, only if implemented in rank.py
 try:
-    from .rank import try_answer_rank_weapons  # optional
-except Exception:  # pragma: no cover - fallback in case rank weapons isn't implemented
-    def try_answer_rank_weapons(
-        question: str, passages: List[Dict[str, Any]]
-    ) -> Optional[str]:
+    from .rank import try_answer_rank_weapons  # type: ignore
+except ImportError:  # pragma: no cover - fallback in case rank weapons isn't implemented
+    def try_answer_rank_weapons(question, passages):
         return None
 
 
@@ -28,15 +29,11 @@ try:
         try_answer_weapon_profile,   # weapon overview (hanbo, katana, shuriken, etc.)
         try_answer_katana_parts,     # special case: parts of the katana
     )
-except Exception:  # pragma: no cover
-    def try_answer_weapon_profile(
-        question: str, passages: List[Dict[str, Any]]
-    ) -> Optional[str]:
+except ImportError:  # pragma: no cover
+    def try_answer_weapon_profile(question, passages):
         return None
 
-    def try_answer_katana_parts(
-        question: str, passages: List[Dict[str, Any]]
-    ) -> Optional[str]:
+    def try_answer_katana_parts(question, passages):
         return None
 
 
@@ -52,10 +49,8 @@ from .leadership import try_extract_answer as try_leadership
 # Glossary fallback (single-term Bujinkan / ninjutsu terms)
 try:
     from .glossary import try_answer_glossary
-except Exception:  # pragma: no cover
-    def try_answer_glossary(
-        question: str, passages: List[Dict[str, Any]]
-    ) -> Optional[str]:
+except ImportError:  # pragma: no cover
+    def try_answer_glossary(question, passages):
         return None
 
 
@@ -78,6 +73,15 @@ def try_extract_answer(
         return ans
 
     ans = try_answer_rank_jime(question, passages)
+    if ans:
+        return ans
+
+    # --- Rank-specific: Ukemi / Taihenjutsu
+    ans = try_answer_rank_ukemi(question, passages)
+    if ans:
+        return ans
+
+    ans = try_answer_rank_taihenjutsu(question, passages)
     if ans:
         return ans
 
