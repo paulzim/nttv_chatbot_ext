@@ -23,12 +23,17 @@ services:
       # === Retrieval / Index ===
       - key: EMBED_MODEL_NAME
         value: sentence-transformers/all-MiniLM-L6-v2
+      - key: INDEX_DIR
+        value: /var/data/index
+      - key: CONFIG_PATH
+        value: /var/data/index/config.json
       - key: INDEX_PATH
         value: /var/data/index/faiss.index
       - key: META_PATH
         value: /var/data/index/meta.pkl
       - key: RANK_FILE
         value: data/nttv rank requirements.txt
+
 
       # === Decoding / Behavior ===
       - key: TOP_K
