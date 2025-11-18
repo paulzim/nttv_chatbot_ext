@@ -5,8 +5,9 @@ services:
   - type: web
     name: nttv-chatbot
     runtime: python
+    pythonVersion: 3.11.11 
     region: oregon
-    plan: starter        # free | starter | standard | pro — pick what fits
+    plan: free        # free | starter | standard | pro — pick what fits
     autoDeploy: true
 
     envVars:
