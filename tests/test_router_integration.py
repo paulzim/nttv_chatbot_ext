@@ -8,6 +8,7 @@ RANK = DATA / "nttv rank requirements.txt"
 WEAPONS = DATA / "NTTV Weapons Reference.txt"
 GLOSS = DATA / "Glossary - edit.txt"
 TECH = DATA / "Technique Descriptions.md"
+SANSHIN = DATA / "nttv training reference.txt"
 
 
 def _passages_rank_and_gloss():
@@ -46,6 +47,20 @@ def _passages_tech_and_gloss():
             "text": TECH.read_text(encoding="utf-8"),
             "source": "Technique Descriptions.md",
             "meta": {"priority": 1},
+        },
+        {
+            "text": GLOSS.read_text(encoding="utf-8"),
+            "source": "Glossary - edit.txt",
+            "meta": {"priority": 1},
+        },
+    ]
+
+def _passages_sanshin_and_gloss():
+    return [
+        {
+            "text": SANSHIN.read_text(encoding="utf-8"),
+            "source": "nttv training reference.txt",
+            "meta": {"priority": 2},
         },
         {
             "text": GLOSS.read_text(encoding="utf-8"),
@@ -138,3 +153,197 @@ def test_router_handles_many_noisy_passages_quickly():
 
     assert isinstance(ans, str) and ans.strip()
     assert "8th Kyu kicks:" in ans
+    
+    
+    def test_router_handles_many_noisy_passages():
+        """
+       Performance guardrail: router should still return a correct answer
+        when given a large number of irrelevant passages plus one real rank passage.
+        We don't assert on timing; we just make sure it doesn't fall over
+        or lose the correct result in the noise.
+        """
+    # 500+ noisy passages
+    noisy = [
+        {
+            "text": "lorem ipsum dolor sit amet " * 5,
+            "source": f"noise_{i}.txt",
+            "meta": {"priority": 5},
+        }
+        for i in range(600)
+    ]
+
+    # Real rank data with proper priority
+    passages = noisy + [
+        {
+            "text": RANK.read_text(encoding="utf-8"),
+            "source": "nttv rank requirements.txt",
+            "meta": {"priority": 3},
+        }
+    ]
+
+    q = "What kicks do I need to know for 8th kyu?"
+    ans = try_extract_answer(q, passages)
+
+    assert isinstance(ans, str) and ans.strip()
+    low = ans.lower()
+
+    # Same expectations as our normal rank test: we got the right answer,
+    # not lost in the noise.
+    assert "8th kyu kicks:" in low
+    assert "sokuho geri" in low
+    assert "koho geri" in low
+
+def test_router_musha_dori_meaning_phrase():
+    """
+    'What does Musha Dori mean?' should be handled by the technique
+    extractor (not the glossary), using Technique Descriptions.md.
+    """
+    from pathlib import Path
+
+    passages = [
+        {
+            "text": TECH.read_text(encoding="utf-8"),
+            "source": "Technique Descriptions.md",
+            "meta": {"priority": 1},
+        },
+        {
+            "text": GLOSS.read_text(encoding="utf-8"),
+            "source": "Glossary - edit.txt",
+            "meta": {"priority": 1},
+        },
+    ]
+
+    q = "What does Musha Dori mean?"
+    ans = try_extract_answer(q, passages)
+
+    assert isinstance(ans, str) and ans.strip()
+    low = ans.lower()
+
+    assert "musha dori" in low
+    # Technique extractor formatting
+    assert "translation:" in low
+    assert "type:" in low
+    assert "description:" in low
+
+
+def test_router_explain_musha_dori_phrase():
+    """
+    'Explain Musha Dori' should also go through the technique extractor.
+    """
+    passages = [
+        {
+            "text": TECH.read_text(encoding="utf-8"),
+            "source": "Technique Descriptions.md",
+            "meta": {"priority": 1},
+        },
+        {
+            "text": GLOSS.read_text(encoding="utf-8"),
+            "source": "Glossary - edit.txt",
+            "meta": {"priority": 1},
+        },
+    ]
+
+    q = "Explain Musha Dori"
+    ans = try_extract_answer(q, passages)
+
+    assert isinstance(ans, str) and ans.strip()
+    low = ans.lower()
+
+    assert "musha dori" in low
+    assert "translation:" in low
+    assert "description:" in low
+
+
+def test_router_tell_me_about_oni_kudaki():
+    """
+    'Tell me about Oni Kudaki' should still be answered by the technique
+    extractor, not the glossary.
+    """
+    passages = [
+        {
+            "text": TECH.read_text(encoding="utf-8"),
+            "source": "Technique Descriptions.md",
+            "meta": {"priority": 1},
+        },
+        {
+            "text": GLOSS.read_text(encoding="utf-8"),
+            "source": "Glossary - edit.txt",
+            "meta": {"priority": 1},
+        },
+    ]
+
+    q = "Tell me about Oni Kudaki"
+    ans = try_extract_answer(q, passages)
+
+    assert isinstance(ans, str) and ans.strip()
+    low = ans.lower()
+
+    assert "oni kudaki" in low
+    assert "translation:" in low
+    assert "definition:" in low
+    assert "description:" in low
+
+
+def test_router_list_sanshin_uses_sanshin_extractor():
+    """
+    'List Sanshin' should be answered by the Sanshin extractor, giving the
+    five elemental Sanshin no Kata, not by the glossary.
+    """
+    passages = _passages_sanshin_and_gloss()
+
+    q = "List Sanshin"
+    ans = try_extract_answer(q, passages)
+
+    assert isinstance(ans, str) and ans.strip()
+    low = ans.lower()
+
+    # Should clearly be about Sanshin no Kata
+    assert "sanshin no kata" in low or "san shin no kata" in low
+
+    # And list the five elemental forms
+    for tok in [
+        "chi no kata",
+        "sui no kata",
+        "ka no kata",
+        "fu no kata",
+        "ku no kata",
+    ]:
+        assert tok in low
+
+
+def test_router_diff_omote_vs_ura_gyaku():
+    """
+    'What's the difference between Omote Gyaku and Ura Gyaku?'
+    should be handled by the technique diff extractor, producing
+    a structured comparison derived from Technique Descriptions.
+    """
+    passages = [
+        {
+            "text": TECH.read_text(encoding="utf-8"),
+            "source": "Technique Descriptions.md",
+            "meta": {"priority": 1},
+        },
+        {
+            "text": GLOSS.read_text(encoding="utf-8"),
+            "source": "Glossary - edit.txt",
+            "meta": {"priority": 1},
+        },
+    ]
+
+    q = "What's the difference between Omote Gyaku and Ura Gyaku?"
+    ans = try_extract_answer(q, passages)
+
+    assert isinstance(ans, str) and ans.strip()
+    low = ans.lower()
+
+    # Both techniques should be present
+    assert "omote gyaku" in low
+    assert "ura gyaku" in low
+
+    # Diff extractor should emit "difference between ..."
+    assert "difference between omote gyaku and ura gyaku" in low
+
+    # And show structured fields
+    assert "translation:" in low
+    assert "type:" in low
+    assert "description:" in low

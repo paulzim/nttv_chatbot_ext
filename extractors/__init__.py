@@ -41,6 +41,14 @@ except ImportError:  # pragma: no cover
 from .kyusho import try_answer_kyusho
 from .kihon_happo import try_answer_kihon_happo   # keep this before generic techniques
 from .techniques import try_answer_technique
+
+# Technique diff extractor (diff between two techniques, e.g. Omote vs Ura Gyaku)
+try:
+    from .technique_diff import try_answer_technique_diff  # type: ignore
+except ImportError:  # pragma: no cover
+    def try_answer_technique_diff(question, passages):
+        return None
+
 from .sanshin import try_answer_sanshin           # must accept (question, passages)
 
 # Leadership (Soke lookups)
@@ -121,6 +129,11 @@ def try_extract_answer(
 
     # --- Kihon Happo (run BEFORE techniques so it wins over general technique matches)
     ans = try_answer_kihon_happo(question, passages)
+    if ans:
+        return ans
+
+    # --- Technique diffs (Omote Gyaku vs Ura Gyaku, etc.)
+    ans = try_answer_technique_diff(question, passages)
     if ans:
         return ans
 
