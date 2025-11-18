@@ -40,11 +40,11 @@ from extractors.technique_match import (
 # ---------------------------
 # Load index & metadata
 # ---------------------------
-# Local default: repo_relative/index
-default_index_dir = os.path.join(os.path.dirname(__file__), "index")
+# Default: local ./index (for your LM Studio / local dev)
+DEFAULT_INDEX_DIR = os.path.join(os.path.dirname(__file__), "index")
 
-# Allow overrides for hosted environments (e.g. Render)
-INDEX_DIR = os.getenv("INDEX_DIR", default_index_dir)
+# Allow Render (or any deployment) to override via env
+INDEX_DIR = os.getenv("INDEX_DIR", DEFAULT_INDEX_DIR)
 CONFIG_PATH = os.getenv("CONFIG_PATH", os.path.join(INDEX_DIR, "config.json"))
 META_PATH = os.getenv("META_PATH", os.path.join(INDEX_DIR, "meta.pkl"))
 
@@ -56,7 +56,7 @@ with open(CONFIG_PATH, "r", encoding="utf-8") as f:
 
 EMBED_MODEL_NAME = cfg.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2")
 
-# If INDEX_PATH is set (e.g. /var/data/index/faiss.index on Render), use that first
+# Env wins, then config, then local default
 FAISS_PATH = (
     os.getenv("INDEX_PATH")
     or cfg.get("faiss_path")
@@ -68,11 +68,11 @@ TOP_K = int(cfg.get("top_k", 6))
 with open(META_PATH, "rb") as f:
     CHUNKS: List[Dict[str, Any]] = pickle.load(f)
 
-
 if faiss is None:
     raise RuntimeError("faiss is not installed. Please `pip install faiss-cpu` (Windows: faiss-cpu).")
 
 index = faiss.read_index(FAISS_PATH)
+
 
 # Lazy-load embeddings
 _EMBED_MODEL = None
