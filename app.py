@@ -40,9 +40,13 @@ from extractors.technique_match import (
 # ---------------------------
 # Load index & metadata
 # ---------------------------
-INDEX_DIR = os.path.join(os.path.dirname(__file__), "index")
-CONFIG_PATH = os.path.join(INDEX_DIR, "config.json")
-META_PATH = os.path.join(INDEX_DIR, "meta.pkl")
+# Local default: repo_relative/index
+default_index_dir = os.path.join(os.path.dirname(__file__), "index")
+
+# Allow overrides for hosted environments (e.g. Render)
+INDEX_DIR = os.getenv("INDEX_DIR", default_index_dir)
+CONFIG_PATH = os.getenv("CONFIG_PATH", os.path.join(INDEX_DIR, "config.json"))
+META_PATH = os.getenv("META_PATH", os.path.join(INDEX_DIR, "meta.pkl"))
 
 if not os.path.exists(CONFIG_PATH):
     raise FileNotFoundError(f"Missing index config: {CONFIG_PATH}")
@@ -51,11 +55,19 @@ with open(CONFIG_PATH, "r", encoding="utf-8") as f:
     cfg = json.load(f)
 
 EMBED_MODEL_NAME = cfg.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2")
-FAISS_PATH = cfg.get("faiss_path") or os.path.join(INDEX_DIR, "faiss.index")
+
+# If INDEX_PATH is set (e.g. /var/data/index/faiss.index on Render), use that first
+FAISS_PATH = (
+    os.getenv("INDEX_PATH")
+    or cfg.get("faiss_path")
+    or os.path.join(INDEX_DIR, "faiss.index")
+)
+
 TOP_K = int(cfg.get("top_k", 6))
 
 with open(META_PATH, "rb") as f:
     CHUNKS: List[Dict[str, Any]] = pickle.load(f)
+
 
 if faiss is None:
     raise RuntimeError("faiss is not installed. Please `pip install faiss-cpu` (Windows: faiss-cpu).")

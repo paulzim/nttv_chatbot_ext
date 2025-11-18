@@ -2,6 +2,8 @@
 streamlit==1.39.0
 python-dotenv==1.0.1
 httpx<0.28
+requests>=2.31.0
+
 
 
 # Retrieval
@@ -21,6 +23,8 @@ httpcore<1.0
 
 # OpenAI-compatible client (works with OpenRouter or LM Studio)
 openai==1.52.2
+
+pytest>=8.0.0
 
 # Optional (uncomment only if you need them)
 # fastapi==0.115.0

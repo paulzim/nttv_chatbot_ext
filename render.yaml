@@ -13,10 +13,12 @@ services:
       # === LLM / Provider ===
       - key: OPENAI_BASE_URL
         value: https://openrouter.ai/api/v1
-      - key: MODEL_NAME
-        value: openrouter/anthropic/claude-3.5-sonnet
+      - key: MODEL
+        value: google/gemma-3n-e2b-it:free
       - key: OPENAI_API_KEY
-        sync: false         # add the secret in Render dashboard after first deploy
+        sync: false         # optional: you can use this instead of OPENROUTER_API_KEY if you want
+      - key: OPENROUTER_API_KEY
+        sync: false         # set this in the Render dashboard with your OpenRouter key
 
       # === Retrieval / Index ===
       - key: EMBED_MODEL_NAME
