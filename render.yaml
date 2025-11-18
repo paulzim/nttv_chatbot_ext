@@ -5,7 +5,7 @@ services:
   - type: web
     name: nttv-chatbot
     runtime: python
-    pythonVersion: 3.11.11 
+    pythonVersion: 3.11.11   # <-- THIS is the Python version Render should use
     region: oregon
     plan: free        # free | starter | standard | pro — pick what fits
     autoDeploy: true
@@ -17,14 +17,9 @@ services:
       - key: MODEL
         value: google/gemma-3n-e2b-it:free
       - key: OPENAI_API_KEY
-        sync: false         # optional: you can use this instead of OPENROUTER_API_KEY if you want
+        sync: false         # optional
       - key: OPENROUTER_API_KEY
         sync: false         # set this in the Render dashboard with your OpenRouter key
-
-
-      # === Python version ===
-      - key: PYTHON_VERSION
-        value: 3.11.11
 
       # === Retrieval / Index ===
       - key: EMBED_MODEL_NAME
@@ -39,7 +34,6 @@ services:
         value: /var/data/index/meta.pkl
       - key: RANK_FILE
         value: data/nttv rank requirements.txt
-
 
       # === Decoding / Behavior ===
       - key: TOP_K
