@@ -4,7 +4,8 @@ python-dotenv==1.0.1
 httpx<0.28
 requests>=2.31.0
 
-
+# Explicit YAML dependency to avoid source builds
+PyYAML==6.0.2
 
 
 # Retrieval
