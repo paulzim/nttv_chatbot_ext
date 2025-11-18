@@ -20,6 +20,11 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false         # set this in the Render dashboard with your OpenRouter key
 
+
+      # === Python version ===
+      - key: PYTHON_VERSION
+        value: 3.11.11
+
       # === Retrieval / Index ===
       - key: EMBED_MODEL_NAME
         value: sentence-transformers/all-MiniLM-L6-v2
