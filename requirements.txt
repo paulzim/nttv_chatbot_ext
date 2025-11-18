@@ -6,8 +6,9 @@ requests>=2.31.0
 
 
 
+
 # Retrieval
-faiss-cpu==1.8.0.post1
+faiss-cpu==1.13.0
 sentence-transformers==2.7.0
 transformers==4.44.2
 safetensors>=0.4.2,<1.0.0
