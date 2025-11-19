@@ -4,7 +4,6 @@ python-dotenv==1.0.1
 
 # --- HTTP clients ---
 httpx==0.27.2
-httpcore==0.18.0
 requests==2.32.5
 
 # --- Retrieval / embeddings / FAISS ---
