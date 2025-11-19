@@ -74,6 +74,7 @@ if faiss is None:
 index = faiss.read_index(FAISS_PATH)
 
 
+
 # Lazy-load embeddings
 _EMBED_MODEL = None
 def get_embedder():
