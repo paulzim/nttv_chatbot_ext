@@ -40,10 +40,10 @@ from extractors.technique_match import (
 # ---------------------------
 # Load index & metadata
 # ---------------------------
-# Default: local ./index (for your LM Studio / local dev)
+# Default: local ./index (for LM Studio / dev)
 DEFAULT_INDEX_DIR = os.path.join(os.path.dirname(__file__), "index")
 
-# Allow Render (or any deployment) to override via env
+# Allow environment overrides (Render, other deployments)
 INDEX_DIR = os.getenv("INDEX_DIR", DEFAULT_INDEX_DIR)
 CONFIG_PATH = os.getenv("CONFIG_PATH", os.path.join(INDEX_DIR, "config.json"))
 META_PATH = os.getenv("META_PATH", os.path.join(INDEX_DIR, "meta.pkl"))
@@ -72,6 +72,7 @@ if faiss is None:
     raise RuntimeError("faiss is not installed. Please `pip install faiss-cpu` (Windows: faiss-cpu).")
 
 index = faiss.read_index(FAISS_PATH)
+
 
 
 
