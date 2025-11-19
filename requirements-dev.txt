@@ -1,0 +1,45 @@
+# App 
+streamlit==1.39.0
+python-dotenv==1.0.1
+httpx<0.28
+requests>=2.31.0
+
+# Explicit YAML dependency to avoid source builds
+PyYAML==6.0.2
+
+
+# Retrieval
+faiss-cpu==1.13.0
+sentence-transformers==2.7.0
+transformers==4.44.2
+safetensors>=0.4.2,<1.0.0
+numpy>=1.26.4,<2.0.0
+pypdf>=4.2.0
+langchain-text-splitters>=0.2.1
+tqdm>=4.66.0
+langchain>=0.2
+python-docx
+httpx<0.28
+httpcore<1.0
+
+
+# OpenAI-compatible client (works with OpenRouter or LM Studio)
+openai==1.52.2
+
+pytest>=8.0.0
+
+# Optional (uncomment only if you need them)
+# fastapi==0.115.0
+# uvicorn==0.30.6
+# pydantic==2.8.2
+
+# REQUEST_TIMEOUT=180
+# MAX_RETRIES=2
+# TOP_K=12
+# MAX_TOKENS=512
+
+# USE_CHAT_ONLY=true
+
+
+# SEED_POLICY=always   # always add seed chunks to pool
+
