@@ -62,40 +62,84 @@ def _load_index_and_meta() -> Tuple[Any, List[Dict[str, Any]]]:
     config_path = os.getenv("CONFIG_PATH", os.path.join(index_dir, "config.json"))
     meta_path = os.getenv("META_PATH", os.path.join(index_dir, "meta.pkl"))
 
+    # ---- Basic existence checks for config/meta
     if not os.path.exists(config_path):
         raise RuntimeError(
-            f"Index config not found at {config_path}. "
-            "On Render, make sure ingest.py ran successfully and wrote the index."
-        )
-    if not os.path.exists(meta_path):
-        raise RuntimeError(
-            f"Index metadata not found at {meta_path}. "
-            "On Render, make sure ingest.py wrote meta.pkl."
+            f"Index config not found at {config_path}.\n"
+            "Hints:\n"
+            f"- INDEX_DIR is currently: {index_dir}\n"
+            "- On Render, make sure ingest.py ran successfully in the build step.\n"
+            "- Confirm config.json was written into that INDEX_DIR."
         )
 
+    if not os.path.exists(meta_path):
+        raise RuntimeError(
+            f"Index metadata not found at {meta_path}.\n"
+            "Hints:\n"
+            f"- INDEX_DIR is currently: {index_dir}\n"
+            "- On Render, confirm ingest.py wrote meta.pkl into the same directory as config.json.\n"
+            "- If you changed INDEX_DIR in the environment, make sure ingest.py and app.py agree."
+        )
+
+    # ---- Load config
     with open(config_path, "r", encoding="utf-8") as f:
         cfg = json.load(f)
 
-    EMBED_MODEL_NAME = cfg.get("embedding_model", EMBED_MODEL_NAME)
-    faiss_path = (
-        os.getenv("INDEX_PATH")
-        or cfg.get("faiss_path")
-        or os.path.join(index_dir, "faiss.index")
+    # Support both 'embedding_model' (new) and 'embed_model' (old) keys
+    EMBED_MODEL_NAME = (
+        cfg.get("embedding_model")
+        or cfg.get("embed_model")
+        or EMBED_MODEL_NAME
     )
-    TOP_K_CFG = int(cfg.get("top_k", 6))
+
+    # TOP_K is optional; default remains 6
+    TOP_K_CFG = int(cfg.get("top_k", TOP_K))
 
     if faiss is None:
         raise RuntimeError(
-            "faiss is not installed. "
-            "Add `faiss-cpu==1.13.0` to requirements.txt (already there for this app)."
+            "faiss is not installed.\n"
+            "Make sure `faiss-cpu==1.13.0` is present in requirements.txt and installed."
         )
 
-    if not os.path.exists(faiss_path):
+    # ---- Resolve FAISS index path robustly
+    faiss_candidates: list[str] = []
+
+    # 1) Hard override via env
+    idx_env = os.getenv("INDEX_PATH")
+    if idx_env:
+        faiss_candidates.append(idx_env)
+
+    # 2) Config-specified path (absolute or relative to index_dir)
+    cfg_faiss = cfg.get("faiss_path")
+    if cfg_faiss:
+        if os.path.isabs(cfg_faiss):
+            faiss_candidates.append(cfg_faiss)
+        else:
+            faiss_candidates.append(os.path.join(index_dir, cfg_faiss))
+
+    # 3) Backwards-compatible default names inside index_dir
+    faiss_candidates.append(os.path.join(index_dir, "index.faiss"))  # what ingest.py writes
+    faiss_candidates.append(os.path.join(index_dir, "faiss.index"))  # legacy name
+
+    faiss_path: Optional[str] = None
+    for cand in faiss_candidates:
+        if cand and os.path.exists(cand):
+            faiss_path = cand
+            break
+
+    if not faiss_path:
+        tried = "\n".join(f"- {c}" for c in faiss_candidates if c)
         raise RuntimeError(
-            f"FAISS index not found at {faiss_path}. "
-            "On Render, confirm ingest.py wrote the index file."
+            "FAISS index file not found.\n"
+            "Paths tried:\n"
+            f"{tried}\n\n"
+            "Hints:\n"
+            "- Ensure ingest.py has been run in this environment and completed successfully.\n"
+            "- On Render, the build command should run `python ingest.py`.\n"
+            "- If you set INDEX_DIR or INDEX_PATH in the environment, confirm they match where ingest.py writes."
         )
 
+    # ---- Actually load FAISS + meta
     idx = faiss.read_index(faiss_path)
 
     with open(meta_path, "rb") as f:
@@ -107,6 +151,7 @@ def _load_index_and_meta() -> Tuple[Any, List[Dict[str, Any]]]:
     globals()["TOP_K"] = TOP_K_CFG
 
     return idx, chunks
+
 
 
 # --------------------------------------------------------------------
@@ -1069,6 +1114,30 @@ with st.sidebar:
     model = os.environ.get("MODEL", "gpt-4o-mini")
     st.caption(f"LLM base: `{base}`")
     st.caption(f"Model: `{model}`")
+    
+    if show_debug:
+        st.markdown("---")
+        with st.expander("Index diagnostics", expanded=False):
+            index_dir = os.getenv("INDEX_DIR", DEFAULT_INDEX_DIR)
+            config_path = os.getenv("CONFIG_PATH", os.path.join(index_dir, "config.json"))
+            meta_path = os.getenv("META_PATH", os.path.join(index_dir, "meta.pkl"))
+
+            st.write("**Working directory:**", os.getcwd())
+            st.write("**__file__ dir:**", os.path.dirname(__file__))
+            st.write("**INDEX_DIR:**", index_dir)
+            st.write("**CONFIG_PATH:**", config_path, "✅" if os.path.exists(config_path) else "❌")
+            st.write("**META_PATH:**", meta_path, "✅" if os.path.exists(meta_path) else "❌")
+
+            # Likely FAISS locations
+            idx_env = os.getenv("INDEX_PATH")
+            if idx_env:
+                st.write("**INDEX_PATH (env):**", idx_env, "✅" if os.path.exists(idx_env) else "❌")
+
+            faiss_guess_1 = os.path.join(index_dir, "index.faiss")
+            faiss_guess_2 = os.path.join(index_dir, "faiss.index")
+            st.write("**FAISS candidate 1:**", faiss_guess_1, "✅" if os.path.exists(faiss_guess_1) else "❌")
+            st.write("**FAISS candidate 2:**", faiss_guess_2, "✅" if os.path.exists(faiss_guess_2) else "❌")
+    
 
 q = st.text_input("Ask a question:", value="", placeholder="e.g., what is omote gyaku")
 go = st.button("Ask", type="primary")

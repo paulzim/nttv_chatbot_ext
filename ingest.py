@@ -175,16 +175,27 @@ def main() -> None:
     with META_PATH.open("wb") as f:
         pickle.dump(all_chunks, f)
 
+    # Config is read by app.py; keep old keys for backwards-compat
     config = {
+        # Preferred key for app.py
+        "embedding_model": EMBED_MODEL_NAME,
+        # Backwards-compatible alias (what you used before)
         "embed_model": EMBED_MODEL_NAME,
+
+        # Where the FAISS index actually lives (absolute path is fine)
+        "faiss_path": str(FAISS_PATH),
+
+        # Default retrieval depth (kept in sync with app.py TOP_K)
+        "top_k": 6,
+
         "chunk_size": CHUNK_SIZE,
         "chunk_overlap": CHUNK_OVERLAP,
         "files": [str(f.relative_to(ROOT)) for f in files],
     }
+
     print(f"Saving config to {CONFIG_PATH}")
     CONFIG_PATH.write_text(json.dumps(config, indent=2), encoding="utf-8")
 
-    print(f"\nIndex built. Files saved in {INDEX_DIR}")
 
 
 if __name__ == "__main__":
