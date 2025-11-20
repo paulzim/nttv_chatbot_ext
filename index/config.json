@@ -1,1 +1,21 @@
-{"embed_model": "sentence-transformers/all-MiniLM-L6-v2", "dim": 384}
+{
+  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "embed_model": "sentence-transformers/all-MiniLM-L6-v2",
+  "faiss_path": "C:\\Users\\paulz\\GitHub\\nttv_chatbot_ext\\index\\index.faiss",
+  "top_k": 6,
+  "chunk_size": 700,
+  "chunk_overlap": 120,
+  "files": [
+    "data\\Bujinkan Leadership and Wisdom.txt",
+    "data\\Glossary - edit.txt",
+    "data\\Kaname.txt",
+    "data\\KYUSHO.txt",
+    "data\\nttv rank requirements.txt",
+    "data\\nttv training reference.txt",
+    "data\\NTTV Weapons Reference.txt",
+    "data\\Schools of the Bujinkan Summaries.txt",
+    "data\\Shuriken Throwing Basics.txt",
+    "data\\Technique Descriptions.md",
+    "data\\What is Buyu.txt"
+  ]
+}
