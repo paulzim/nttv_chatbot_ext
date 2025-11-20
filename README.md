@@ -1,276 +1,246 @@
-# Local RAG Chatbot with LM Studio + Gemma-3-12B + Streamlit
+# NTTV Chatbot — Deterministic RAG Assistant for Ninja Training TV
 
-This project is a **Retrieval-Augmented Generation (RAG) chatbot** that runs **completely locally**.  
-It uses:
+A **RAG-based**, **extractor-driven**, and **deterministic** chatbot for Ninja Training TV (NTTV).  
+Built in Python using **FAISS**, **sentence-transformers**, **Streamlit**, and a suite of custom **extractors** for rank, kihon, sanshin, schools, weapons, kyusho, and more.
 
-- **LM Studio** to serve the `gemma-3-12b` model via an OpenAI-compatible API.
-- **FAISS** for fast local vector search over your documents.
-- **Streamlit** for an interactive web-based chat interface.
-- **Sentence Transformers** to embed document chunks and user queries.
-- **Reranking & Hybrid Logic** to improve retrieval accuracy.
+Runs **locally** or in the **cloud (Render)** with the same index + retrieval pipeline.
 
 ---
 
-## 🚀 Features
+## 🚀 Key Features
 
-- Runs entirely on your machine — **no external API calls**.
-- Loads and indexes local `.txt` documents into FAISS.
-- Answers questions using **retrieved document chunks** as context.
-- **Hybrid fallback** mode (optional) — can answer from the model’s own knowledge if retrieval fails.
-- Shows **source citations** for transparency.
-- Simple to extend with PDFs, DOCX, or other formats.
+### 🧠 Deterministic Knowledge Layer
 
----
+- Extractors for:
+  - **Rank requirements**
+  - **Kihon Happō**
+  - **Sanshin no Kata**
+  - **Schools (Ryūha)**
+  - **Weapons**
+  - **Kyusho**
+- Hard-coded, rank-aware responses where appropriate.
+- Zero hallucinations for strict/deterministic queries when extractors fire.
 
-## 📂 Project Structure
+### 🔍 RAG Retrieval Engine
 
- ```
- nttv_ai_bot/
- │
- ├── app.py # Streamlit UI + RAG query logic
- ├── ingest.py # Document parsing, chunking, embedding, and FAISS index build
- ├── requirements.txt # Python dependencies
- ├── .env # Environment variables (model name, API URL, etc.)
- ├── index/ # FAISS index files (created by ingest.py)
- ├── docs/ # Source documents (.txt in current setup)
- └── README.md # This file
-```
+- **FAISS** vector index
+- **Sentence-Transformers** embeddings (`all-MiniLM-L6-v2`)
+- Priority-aware reranking:
+  - **P1**: Rank files
+  - **P2**: Techniques / schools / kihon / weapons
+  - **P3**: Other passages
+- Adjustable **TOP_K** and fallback heuristics.
 
-## 🛠 Prerequisites
+### 💬 Streamlit App UI
 
-- **Python 3.10+** (recommend using `venv` or `conda`)
-- **LM Studio** installed ([Download here](https://lmstudio.ai/))
-- `gemma-3-12b` model downloaded in LM Studio
-- **Git** for cloning the repo
-
----
-
-## 📥 Installation
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/nttv_ai_bot.git
-   cd nttv_ai_bot
-2. Create and activate a virtual environment
-python -m venv .venv
- source .venv/bin/activate   # Mac/Linux
- .venv\Scripts\activate      # Windows
-3. Install dependencies
- pip install -r requirements.txt
-4. Set up environment variables
-Create a .env file in the root directory:
-env
-OPENAI_BASE_URL=http://127.0.0.1:1234   # Local LM Studio API endpoint
-OPENAI_API_KEY=lm-studio                # Dummy key (LM Studio ignores it)
-MODEL_NAME=google/gemma-3-12b           # Model identifier in LM Studio
-## 📄 **Preparing Your Documents**
-1. Place your .txt files in the docs/ folder.
-2. Run the ingestion script to create the FAISS index:
- python ingest.py
-This will:
-- Read and chunk your text files.
-- Generate embeddings with SentenceTransformers.
-- Store them in index/faiss.index and index/meta.pkl.
-
-## 💬 **Running the Chatbot**
-1. Start LM Studio:
-2. Load gemma-3-12b (or your chosen model).
-3. Click Local Server to enable the OpenAI API endpoint.
-Note the local address (e.g., http://127.0.0.1:1234).
-4. Run Streamlit:
- streamlit run app.py
-5. Open the browser window shown in your terminal (usually http://localhost:8501).
-6. Ask your question!
-- The app retrieves the top-k most relevant document chunks from FAISS.
-- Passes them as context to the model.
-- Displays the answer + retrieved sources.
-
-## ⚙ **Configuration**
-You can tweak these in .env or inside app.py:
-
-Variable	Description	Default
-MODEL_NAME	Model identifier in LM Studio	google/gemma-3-12b
-OPENAI_BASE_URL	API endpoint for LM Studio	http://127.0.0.1:1234
-OPENAI_API_KEY	Dummy key for OpenAI-compatible clients	lm-studio
-TOP_K	Number of retrieved chunks	5
-MAX_CONTEXT	Max characters from retrieved chunks	2000
-
-## 🔧  **Extending**
-Adding PDF Support
-- Install PyPDF:
- pip install pypdf
-Update ingest.py to check .pdf and parse with PdfReader.
-- Adding DOCX Support
-Install python-docx:
- pip install python-docx
-Update ingest.py with a .docx handler.
-- Using a Hosted LLM
-Change OPENAI_BASE_URL and MODEL_NAME to your hosted provider’s details.
-Keep the RAG logic the same — only the model endpoint changes.
-
-## 🐛 **Troubleshooting**
-- FAISS index not found
-Run python ingest.py again after adding docs.
-- Model returned no text
-Ensure LM Studio local server is running and MODEL_NAME matches exactly.
-- Slow responses
-Reduce MAX_CONTEXT or switch to a smaller model.
-
-# Updates
-
-# 🥋 NTTV Chatbot (Local RAG → Render)
-
-Deterministic, rank-aware RAG chatbot for NTTV. Local-first design with a one-file Render blueprint for hosting.
+- Question input + answer display
+- **Debug mode** (shows top passages, raw model response)
+- **Explanation mode** (short fact → brief rationale)
+- **Technique detail level** (Brief / Standard / Full)
+- Source citations and passage inspection
 
 ---
 
-## Features
+## 📦 Repository Structure
 
-- **Deterministic extractors** for Rank / Kihon / Sanshin / Schools (+ Kyusho optional)
-- **Rank injection**: rank file always visible to the model for any `kyu` query
-- **Priority-aware reranker** (P1 rank, P2 training/technique, P3 other)
-- **Explanation Mode** toggle (short fact ➜ brief rationale from context)
-- **FAISS + sentence-transformers** retrieval
-- **Streamlit** UI
-
----
-
-## Repo Structure (key files)
-
-app.py # Streamlit app (Explanation Mode toggle included)
-ingest.py # Builds FAISS index from /data into INDEX_PATH/META_PATH
-extractors/ # Deterministic extractors (rank, kihon, sanshin, schools, kyusho)
-data/ # Source of truth text files
-index/ # (Local) FAISS artifacts — cloud uses a mounted disk
-tests/ # Pytest + prompt harness
-render.yaml # Render blueprint (this file)
-
-perl
-Copy code
+    nttv_chatbot_ext/
+    │
+    ├── app.py                 # Streamlit UI + RAG pipeline
+    ├── ingest.py              # Builds FAISS index + meta.pkl from /data
+    ├── extractors/            # Deterministic extractors (rank, kihon, weapons, etc.)
+    ├── data/                  # Authoritative text sources
+    ├── index/                 # Local FAISS index artifacts (created by ingest.py)
+    ├── tests/                 # Pytest suite + prompt harness
+    ├── requirements.txt       # Python dependencies
+    ├── render.yaml            # Render Blueprint for cloud deployment
+    └── README.md              # You are here
 
 ---
 
-## Environment Variables
+## 🛠 Installation (Local)
 
-These are used locally (via `.env`) and in the cloud (via Render dashboard or `render.yaml`).
+### 1. Clone the repo
 
-| Key                           | Example / Default                                       | Purpose |
-|------------------------------|---------------------------------------------------------|---------|
-| `OPENAI_BASE_URL`            | `https://openrouter.ai/api/v1`                          | OpenRouter API root (must end with `/v1`) |
-| `OPENAI_API_KEY`             | `sk-or-...`                                             | OpenRouter key (set as secret in Render) |
-| `MODEL_NAME`                 | `openrouter/anthropic/claude-3.5-sonnet`               | Model ID via OpenRouter |
-| `EMBED_MODEL_NAME`           | `sentence-transformers/all-MiniLM-L6-v2`               | Embedding model for FAISS |
-| `INDEX_PATH`                 | `index/faiss.index` (local) or `/var/data/index/faiss.index` (Render) | FAISS index path |
-| `META_PATH`                  | `index/meta.pkl` (local) or `/var/data/index/meta.pkl` | Index metadata |
-| `RANK_FILE`                  | `data/nttv rank requirements.txt`                      | Primary rank source of truth |
-| `TOP_K`                      | `8`                                                     | Retrieval fan-out (auto-boost for kyu queries) |
-| `MAX_TOKENS`                 | `512`                                                   | Generation cap |
-| `TEMPERATURE`                | `0.0`                                                   | Determinism |
-| `WEAK_THRESH`                | `0.35`                                                  | Switch to hybrid when retrieval is weak |
-| `STREAMLIT_BROWSER_GATHER_USAGE_STATS` | `false`                                      | Disable Streamlit telemetry |
+    git clone https://github.com/paulzim/nttv_chatbot_ext
+    cd nttv_chatbot_ext
 
-### Example `.env` for local
-```ini
-OPENAI_BASE_URL=https://openrouter.ai/api/v1
-OPENAI_API_KEY=sk-or-...
-MODEL_NAME=openrouter/anthropic/claude-3.5-sonnet
+### 2. Create a virtual environment
 
-EMBED_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2
-INDEX_PATH=index/faiss.index
-META_PATH=index/meta.pkl
-RANK_FILE=data/nttv rank requirements.txt
+macOS / Linux:
 
-TOP_K=8
-MAX_TOKENS=512
-TEMPERATURE=0.0
-WEAK_THRESH=0.35
-STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
-⚠️ Never commit real secrets. Keep .env out of git.
+    python -m venv .venv
+    source .venv/bin/activate
 
-Local Development
-bash
-Copy code
-# Create & activate venv (Windows PowerShell)
-py -m venv .venv
-.\.venv\Scripts\activate
+Windows (PowerShell):
 
-pip install -U pip
-pip install -r requirements.txt
+    python -m venv .venv
+    .\.venv\Scripts\activate
 
-# Build/rebuild FAISS index
-python ingest.py
+### 3. Install dependencies
 
-# Run the app
-streamlit run app.py
-Tests (including prompt harness)
-bash
-Copy code
-pytest -q
-Add rank QA prompts under tests/prompts/ (see examples in repo).
+    pip install -U pip
+    pip install -r requirements.txt
 
-The harness injects the real rank file as the first passage so extractors stay deterministic.
+### 4. Build the FAISS index
 
-Deploy to Render (cloud)
-One-time setup
-Fork or push this repo to your GitHub.
+    python ingest.py
 
-Ensure render.yaml is at repo root.
+This reads all files in `data/`, chunks them, embeds them, and writes:
 
-In Render: New → Blueprint → connect the repo.
+- `index/faiss.index`
+- `index/meta.pkl`
+- `index/config.json`
 
-On first deploy, add the secret OPENAI_API_KEY in the service’s Environment tab.
+### 5. Run the chatbot
 
-(Optional) Adjust MODEL_NAME, plan, and region.
+    streamlit run app.py
 
-What the blueprint does
-Installs deps.
+Then open the provided URL (typically `http://localhost:8501`).
 
-Runs python ingest.py during build to populate the FAISS index.
+---
 
-Starts Streamlit with --server.port $PORT --server.address 0.0.0.0.
+## ⚙️ Environment Variables
 
-Mounts a persistent disk at /var/data/index so the index survives restarts.
+Used locally (via `.env`) and in the cloud (via Render).
 
-If you change files in /data, Render will rebuild the index on the next deploy.
-If you want to rebuild without a code change, hit Manual Deploy → Clear build cache & deploy.
+| Variable              | Example                                         | Purpose                               |
+|-----------------------|-------------------------------------------------|---------------------------------------|
+| `OPENAI_BASE_URL`     | `https://openrouter.ai/api/v1`                 | Endpoint for model inference          |
+| `OPENAI_API_KEY`      | `sk-or-...`                                    | API key (keep secret)                 |
+| `MODEL_NAME`          | `openrouter/anthropic/claude-3.5-sonnet`       | LLM identifier                        |
+| `EMBED_MODEL_NAME`    | `sentence-transformers/all-MiniLM-L6-v2`       | Embedding model for FAISS             |
+| `INDEX_DIR`           | `index/`                                       | Index directory root                  |
+| `INDEX_PATH`          | `index/faiss.index`                            | FAISS index file path                 |
+| `META_PATH`           | `index/meta.pkl`                               | Metadata (retrieval chunks)           |
+| `RANK_FILE`           | `data/nttv rank requirements.txt`              | Rank source of truth                  |
+| `TOP_K`               | `6`                                            | Retrieval depth                       |
+| `TEMPERATURE`         | `0.0`                                          | Deterministic output                  |
+| `MAX_TOKENS`          | `512`                                          | Generation token cap                  |
+| `STREAMLIT_BROWSER_GATHER_USAGE_STATS` | `false`                      | Disable Streamlit telemetry           |
 
-Common Issues & Fixes
-502 on first boot
-The app may come up before Streamlit binds the port. Render will retry automatically. If it persists, check logs for missing OPENAI_API_KEY.
+### Example `.env` (local)
 
-Model errors (401/403)
-Ensure OPENAI_BASE_URL=https://openrouter.ai/api/v1 and the MODEL_NAME is valid for your key.
+    OPENAI_BASE_URL=https://openrouter.ai/api/v1
+    OPENAI_API_KEY=sk-or-xxxx
+    MODEL_NAME=openrouter/anthropic/claude-3.5-sonnet
 
-Index not found
-Verify INDEX_PATH and META_PATH point to the mounted disk on Render (/var/data/index/...) and that ingest.py runs in buildCommand.
+    EMBED_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2
+    INDEX_DIR=index
+    INDEX_PATH=index/faiss.index
+    META_PATH=index/meta.pkl
+    RANK_FILE=data/nttv rank requirements.txt
 
-Slow cold start
-First request after deploy may be slower as the platform warms containers and the embeddings model is JIT-loaded.
+    TOP_K=6
+    TEMPERATURE=0.0
+    MAX_TOKENS=512
+    STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
 
-Ops Tips
-Explanation Mode defaults to OFF for determinism. Toggle it in the sidebar when you want brief rationale.
+> ⚠️ Do **not** commit `.env` or real secrets to git.
 
-Keep TEMPERATURE=0.0 in production. If you temporarily raise it, do so only with explain=True.
+---
 
-For observability, consider adding structured logging to record: query type (rank/non-rank), extractor hit/miss, retrieval strength, and mode (strict/hybrid/explain).
+## 🧪 Testing
 
-Roadmap (next)
-Add kyusho.py extractor (deterministic, context-only).
+Run the full test suite:
 
-Expand rank.py synonyms (Nage, Weapons) and keep them strict.
+    pytest -q
 
-Add more prompt packs under tests/prompts/ per rank block.
+Includes:
 
-Optional: add a /healthz route or a tiny st.experimental_rerun() heartbeat on Streamlit if you want Render health checks.
+- Extractor tests (rank, kihon, sanshin, weapons, schools, etc.)
+- Retrieval overlap / consistency checks
+- Prompt harness using real rank file as first passage
+- Technique normalization validations
 
+You can add new prompt tests under:
 
+    tests/prompts/
 
-## 📜 **License**
-MIT License — free to use, modify, and share.
+---
 
-## 🙋 **Credits**
-Developed with:
-- LM Studio
-- Streamlit
-- FAISS
-- Sentence Transformers
+## ☁️ Deploying to Render
+
+### 1. Ensure `render.yaml` is at the repo root
+
+Render uses this as a Blueprint for the service.
+
+### 2. In Render
+
+- New → “Blueprint” → connect this repo.
+- Confirm `buildCommand` runs:
+
+    pip install -U pip && pip install -r requirements.txt && python ingest.py
+
+- Confirm `startCommand` is:
+
+    streamlit run app.py --server.port $PORT --server.address 0.0.0.0
+
+- Add environment variables in the Render dashboard:
+  - `OPENAI_API_KEY`
+  - `OPENAI_BASE_URL`
+  - `MODEL_NAME`
+  - Any overrides for `INDEX_DIR`, `TOP_K`, etc.
+
+### 3. Index rebuilds
+
+Whenever files in `data/` change:
+
+- Push a new commit → Render rebuilds and re-runs `python ingest.py`, or
+- Use “Manual Deploy → Clear build cache & deploy” to force a fresh ingest.
+
+---
+
+## 🔧 Common Issues
+
+### “Index config / meta not found”
+
+- Make sure `python ingest.py` ran successfully.
+- Verify that `index/config.json` and `index/meta.pkl` exist.
+- Check `INDEX_DIR`, `INDEX_PATH`, and `META_PATH` in:
+  - Local `.env`, and/or
+  - Render’s environment settings.
+
+### FAISS index issues
+
+- Ensure `faiss-cpu` is installed (see `requirements.txt`).
+- Confirm `faiss.index` path matches `INDEX_PATH` (or config.json’s `faiss_path`).
+
+### LLM errors (401/403/429)
+
+- Check `OPENAI_API_KEY` validity and scope.
+- Verify `OPENAI_BASE_URL` is correct (including `/v1` suffix).
+- Make sure `MODEL_NAME` is available to your key.
+
+### Slow or 5xx responses on Render
+
+- Free tier may sleep and add startup latency.
+- Upgrade to a plan with more RAM/CPU for smoother RAG + Streamlit.
+- Use Streamlit’s debug mode to inspect retrieval / model timings.
+
+---
+
+## 🧭 Roadmap
+
+- Add deterministic extractor for **Kyusho**.
+- Expand schools and weapons metadata.
+- Add `/healthz` or similar health check endpoint.
+- Provide a simple `deploy.sh` for DigitalOcean / VPS targets.
+- Grow the prompt harness with rank- and weapon-specific test cases.
+
+---
+
+## 📜 License
+
+MIT License — free for personal or commercial use.
+
+---
+
+## 🙏 Credits
+
+Built with:
+
+- Streamlit  
+- FAISS  
+- Sentence-Transformers  
+- OpenRouter / OpenAI-compatible APIs  
+- And a lot of Bujinkan / NTTV curriculum work
