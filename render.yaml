@@ -5,9 +5,9 @@ services:
   - type: web
     name: nttv-chatbot
     runtime: python
-    pythonVersion: 3.11.11   # <-- THIS is the Python version Render should use
+    pythonVersion: 3.11.11   # <-- keep
     region: oregon
-    plan: free        # free | starter | standard | pro — pick what fits
+    plan: free               # keep for now; upgrade later as needed
     autoDeploy: true
 
     envVars:
@@ -15,11 +15,11 @@ services:
       - key: OPENAI_BASE_URL
         value: https://openrouter.ai/api/v1
       - key: MODEL
-        value: google/gemma-3n-e2b-it:free
+        value: google/gemma-3n-e4b-it         # <— changed from the free model
       - key: OPENAI_API_KEY
-        sync: false         # optional
+        sync: false                           # keep (set in dashboard)
       - key: OPENROUTER_API_KEY
-        sync: false         # set this in the Render dashboard with your OpenRouter key
+        sync: false                           # keep (alias; set in dashboard)
 
       # === Retrieval / Index ===
       - key: EMBED_MODEL_NAME
@@ -29,7 +29,7 @@ services:
       - key: CONFIG_PATH
         value: /var/data/index/config.json
       - key: INDEX_PATH
-        value: /var/data/index/index.faiss
+        value: /var/data/index/faiss.index    # keep (ingest dual-writes faiss.index + index.faiss)
       - key: META_PATH
         value: /var/data/index/meta.pkl
       - key: RANK_FILE
@@ -37,7 +37,7 @@ services:
 
       # === Decoding / Behavior ===
       - key: TOP_K
-        value: "8"
+        value: "8"                            # keep your current value here
       - key: MAX_TOKENS
         value: "512"
       - key: TEMPERATURE
@@ -45,10 +45,18 @@ services:
       - key: WEAK_THRESH
         value: "0.35"
       - key: STREAMLIT_BROWSER_GATHER_USAGE_STATS
-        value: "false"
+        value: "false"                        # keep existing flag
+      - key: STREAMLIT_BROWSER_GATHERUSAGESTATS
+        value: "false"                        # <— correct Streamlit var (added)
+
+      # === (Optional) Model cache on persistent disk — speeds up cold starts ===
+      - key: TRANSFORMERS_CACHE
+        value: /var/data/hf_cache
+      - key: SENTENCE_TRANSFORMERS_HOME
+        value: /var/data/st_cache
 
     buildCommand: |
-      pip install -U pip
+      python -m pip install -U pip
       pip install -r requirements.txt
       # (Re)build FAISS index from /data into the mounted disk
       python ingest.py
