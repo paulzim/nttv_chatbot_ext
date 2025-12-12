@@ -17,5 +17,7 @@
     "data\\Shuriken Throwing Basics.txt",
     "data\\Technique Descriptions.md",
     "data\\What is Buyu.txt"
-  ]
+  ],
+  "num_chunks": 373,
+  "faiss_ntotal": 373
 }

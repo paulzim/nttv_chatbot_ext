@@ -1,3 +1,4 @@
+# app.py (patched)
 import os
 import json
 import pickle
@@ -7,6 +8,9 @@ import unicodedata
 
 import numpy as np
 import streamlit as st
+from dotenv import load_dotenv
+load_dotenv()
+
 
 # Vector index
 try:
@@ -121,29 +125,44 @@ def _load_index_and_meta() -> Tuple[Any, List[Dict[str, Any]]]:
     faiss_candidates.append(os.path.join(index_dir, "index.faiss"))  # what ingest.py writes
     faiss_candidates.append(os.path.join(index_dir, "faiss.index"))  # legacy name
 
-    faiss_path: Optional[str] = None
+    tried: list[str] = []
+    def _try_load(fpath: str) -> Optional[Tuple[Any, List[Dict[str, Any]]]]:
+        tried.append(fpath)
+        if not (fpath and os.path.exists(fpath)):
+            return None
+        idx_local = faiss.read_index(fpath)
+        with open(meta_path, "rb") as f:
+            chunks_local: List[Dict[str, Any]] = pickle.load(f)
+        # If obviously mismatched, signal caller to try next candidate
+        ntotal_local = int(getattr(idx_local, "ntotal", 0) or 0)
+        if ntotal_local <= 0 or len(chunks_local) <= 0:
+            return None
+        # If huge mismatch, don't accept this pair (likely stale env path)
+        if abs(ntotal_local - len(chunks_local)) > 0:
+            return None
+        return (idx_local, chunks_local)
+
+    idx = None
+    chunks: List[Dict[str, Any]] = []
+
+    # try candidates in order; skip pairs that mismatch counts
     for cand in faiss_candidates:
-        if cand and os.path.exists(cand):
+        pair = _try_load(cand)
+        if pair is not None:
+            idx, chunks = pair
             faiss_path = cand
             break
 
-    if not faiss_path:
-        tried = "\n".join(f"- {c}" for c in faiss_candidates if c)
+    if idx is None:
+        tried_text = "\n".join(f"- {p}" for p in faiss_candidates if p)
         raise RuntimeError(
-            "FAISS index file not found.\n"
+            "FAISS index file not found or unusable (mismatch with meta.pkl).\n"
             "Paths tried:\n"
-            f"{tried}\n\n"
+            f"{tried_text}\n\n"
             "Hints:\n"
-            "- Ensure ingest.py has been run in this environment and completed successfully.\n"
-            "- On Render, the build command should run `python ingest.py`.\n"
-            "- If you set INDEX_DIR or INDEX_PATH in the environment, confirm they match where ingest.py writes."
+            "- Ensure ingest.py has recently rebuilt index.faiss + meta.pkl together.\n"
+            "- If you set INDEX_PATH to a legacy name (faiss.index), remove it or point it to the new file."
         )
-
-    # ---- Actually load FAISS + meta
-    idx = faiss.read_index(faiss_path)
-
-    with open(meta_path, "rb") as f:
-        chunks: List[Dict[str, Any]] = pickle.load(f)
 
     # Update globals for any code that reads them
     INDEX = idx
@@ -190,16 +209,38 @@ def retrieve(q: str, k: int | None = None) -> List[Dict[str, Any]]:
     if k is None:
         k = TOP_K
 
-    v = embed_query(q)
-    D, I = idx.search(v, k * 2)  # overfetch then rerank
-    cand = []
+    # --- Sanity checks to catch mismatched artifacts early
+    ntotal = int(getattr(idx, "ntotal", 0) or 0)
+    if ntotal <= 0:
+        raise RuntimeError("FAISS index is empty (ntotal=0). Re-run ingest.py.")
 
+    if len(chunks) == 0:
+        raise RuntimeError("meta.pkl loaded but contains 0 chunks. Re-run ingest.py.")
+
+    # If index/meta are out of sync, fail loudly (and print paths via sidebar)
+    if abs(ntotal - len(chunks)) > 0:
+        raise RuntimeError(
+            f"Index/meta mismatch: faiss.ntotal={ntotal}, chunks={len(chunks)}.\n"
+            "This usually means FAISS and meta.pkl are from different ingest runs."
+        )
+
+    v = embed_query(q)
+
+    # Overfetch, but never ask for more than we actually have in the index
+    want = min(max(k * 2, k), ntotal)
+    D, I = idx.search(v, want)
+
+    cand = []
     q_low = q.lower()
 
     for idx_i, score in zip(I[0], D[0]):
+        # FAISS may return -1 for empty slots; also guard out-of-range indices
+        if idx_i < 0 or idx_i >= len(chunks):
+            continue
+
         c = chunks[idx_i]
-        text = c["text"]
-        meta = c["meta"]
+        text = c.get("text", "")
+        meta = c.get("meta", {}) or {}
         t_low = text.lower()
 
         # ---- Priority boost from ingest (preferred), else filename heuristic
@@ -345,7 +386,16 @@ def retrieve(q: str, k: int | None = None) -> List[Dict[str, Any]]:
         )
 
     cand.sort(key=lambda x: x[0], reverse=True)
-    return [c for _, c in cand[:k]]
+    out = [c for _, c in cand[:k]]
+
+    if not out:
+        raise RuntimeError(
+            "Retrieval returned 0 usable passages. This can happen if FAISS returned only -1 indices "
+            "or if index/meta are mismatched.\n"
+            "Try: delete index/ and re-run `python ingest.py`."
+        )
+
+    return out
 
 
 def build_context(snippets: List[Dict[str, Any]], max_chars: int = 6000) -> str:
@@ -361,7 +411,6 @@ def build_context(snippets: List[Dict[str, Any]], max_chars: int = 6000) -> str:
         lines.append(block)
         total += len(block)
     return "".join(lines)
-
 
 def retrieval_quality(hits: List[Dict[str, Any]]) -> float:
     if not hits:

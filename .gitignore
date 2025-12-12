@@ -3,3 +3,4 @@
 /.venv311
 /.venv
 /.vscode
+.env

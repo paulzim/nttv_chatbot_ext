@@ -29,7 +29,7 @@ services:
       - key: CONFIG_PATH
         value: /var/data/index/config.json
       - key: INDEX_PATH
-        value: /var/data/index/faiss.index
+        value: /var/data/index/index.faiss
       - key: META_PATH
         value: /var/data/index/meta.pkl
       - key: RANK_FILE
