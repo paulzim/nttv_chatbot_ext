@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NTTV Chatbot — Local Test</title>
+<style>
+  body { font-family: system-ui, sans-serif; background:#0b0c10; color:#e8eaed; margin:0; }
+  header { padding:12px 16px; background:#111318; border-bottom:1px solid #222; }
+  .wrap { max-width:860px; margin:0 auto; padding:16px; }
+  .row { display:flex; gap:8px; margin-bottom:10px; }
+  input[type="text"] { flex:1; padding:10px; border-radius:10px; border:1px solid #333; background:#111318; color:#e8eaed; }
+  button { padding:10px 14px; border-radius:10px; border:0; background:#4f46e5; color:#fff; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:wait; }
+  .chat { display:flex; flex-direction:column; gap:14px; margin-top:12px; }
+  .bubble { max-width:70%; padding:12px 14px; border-radius:14px; line-height:1.4; white-space:pre-wrap; }
+  .me { align-self:flex-end; background:#1f2937; }
+  .bot { align-self:flex-start; background:#0f172a; border:1px solid #223; }
+  .badge { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; background:#0a8f70; margin-left:8px; vertical-align:middle; }
+  .meta { font-size:12px; color:#9aa0a6; margin-top:4px; }
+  .sources { margin-top:8px; font-size:14px; }
+  .src { margin:6px 0; padding:8px; border-left:3px solid #334155; background:#0c111a; }
+  .src strong { color:#cbd5e1; }
+</style>
+</head>
+<body>
+<header><div class="wrap"><strong>NTTV Chatbot — Local Test</strong></div></header>
+<div class="wrap">
+  <div class="chat" id="chat"></div>
+  <form id="f" class="row" onsubmit="send(event)">
+    <input id="q" type="text" placeholder="Ask something… e.g., When do I learn kusari-fundo?" autofocus />
+    <button id="sendBtn">Send</button>
+  </form>
+</div>
+
+<script>
+const API_BASE = localStorage.getItem("NTTV_API_BASE") || "http://127.0.0.1:8000";
+const API_KEY  = localStorage.getItem("NTTV_API_KEY")  || ""; // optional
+
+const chat = document.getElementById("chat");
+const qEl  = document.getElementById("q");
+const btn  = document.getElementById("sendBtn");
+
+function addBubble(text, who="bot", extras={}) {
+  const div = document.createElement("div");
+  div.className = `bubble ${who}`;
+  div.innerHTML = text;
+  if (extras.badge) {
+    const b = document.createElement("span");
+    b.className = "badge";
+    b.textContent = extras.badge;
+    div.appendChild(b);
+  }
+  chat.appendChild(div);
+
+  if (extras.sources && extras.sources.length) {
+    const wrap = document.createElement("div");
+    wrap.className = "sources";
+    extras.sources.forEach((s, i) => {
+      const item = document.createElement("div");
+      item.className = "src";
+      const label = s.page ? `${s.source} (p.${s.page})` : s.source;
+      item.innerHTML = `<strong>[${i+1}] ${label}</strong><div>${escapeHtml(s.snippet || "").slice(0, 500)}</div>`;
+      wrap.appendChild(item);
+    });
+    chat.appendChild(wrap);
+  }
+  if (extras.meta) {
+    const m = document.createElement("div");
+    m.className = "meta";
+    m.textContent = `model=${extras.meta.model} • retrieval=${extras.meta.retrieval_ms ?? extras.meta.retrieval_count ?? "?"} • llm=${extras.meta.llm_ms ?? "?"}ms`;
+    chat.appendChild(m);
+  }
+  window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+}
+
+function escapeHtml(s){return s.replace(/[&<>'"]/g, c=>({ "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;" }[c]))}
+
+async function send(e){
+  e.preventDefault();
+  const text = qEl.value.trim();
+  if (!text) return;
+  addBubble(escapeHtml(text), "me");
+  qEl.value = ""; qEl.focus(); btn.disabled = true;
+
+  try {
+    const resp = await fetch(`${API_BASE}/query`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(API_KEY ? { "X-API-Key": API_KEY } : {})
+      },
+      body: JSON.stringify({ query: text })
+    });
+    if (!resp.ok) {
+      const msg = await resp.text();
+      throw new Error(`HTTP ${resp.status}: ${msg}`);
+    }
+    const data = await resp.json();
+    const badge = data.det_path ? "Deterministic" : null;
+    addBubble(escapeHtml(data.answer || "[no answer]"), "bot", {
+      badge,
+      sources: data.sources || [],
+      meta: data.meta || {}
+    });
+  } catch (err) {
+    addBubble(escapeHtml("Error: " + (err?.message || err)), "bot");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// quick commands in the console:
+// localStorage.setItem("NTTV_API_BASE","http://127.0.0.1:8000"); location.reload();
+// localStorage.setItem("NTTV_API_KEY","your-key"); location.reload();
+</script>
+</body>
+</html>

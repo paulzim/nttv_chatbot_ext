@@ -25,3 +25,8 @@ pytest==9.0.1
 
 # --- YAML (already pinned for Render) ---
 PyYAML==6.0.2
+
+# --- API Server ---
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+pydantic>=2.7.0
