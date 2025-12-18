@@ -190,6 +190,156 @@ Whenever files in `data/` change:
 
 ---
 
+## Accessing the NTTV Chatbot API (Local)
+
+This repo includes a small **FastAPI** server (`api_server.py`) so you can hit the RAG pipeline over HTTP, plus a minimal **vanilla HTML** test page (`nttv_test.html`) for quick UI testing.
+
+### Prereqs
+- Python 3.11.x
+- A virtualenv with project deps installed
+- Index artifacts built (`python ingest.py`)
+
+> Tip: Always run Python commands **inside your venv**.
+
+```powershell
+# Windows / PowerShell
+.\.venv\Scripts\Activate.ps1
+python -m pip install -U pip
+python -m pip install fastapi uvicorn[standard] pydantic
+```
+
+---
+
+### 1) Launch the API server (FastAPI)
+
+```powershell
+# From repo root, with venv active
+# Optional: set an API key for local auth (omit if you don't want auth)
+$env:NTTV_API_KEY = "dev-local-key"
+
+# Start the API on 127.0.0.1:8000 (reload on file changes)
+python -m uvicorn api_server:app --host 127.0.0.1 --port 8000 --reload
+```
+
+**Health check:**
+
+```powershell
+# PowerShell
+Invoke-RestMethod http://127.0.0.1:8000/healthz
+```
+
+Expected JSON:
+
+```json
+{
+  "status": "ok",
+  "faiss_ntotal": 394,
+  "chunks": 394,
+  "model": "google/gemma-3n-e4b-it"
+}
+```
+
+**Query example (PowerShell):**
+
+```powershell
+# Without API key
+Invoke-RestMethod -Uri http://127.0.0.1:8000/query -Method Post -ContentType 'application/json' -Body '{"query":"When do I learn kusari-fundo?"}'
+
+# With API key
+Invoke-RestMethod -Uri http://127.0.0.1:8000/query -Method Post -ContentType 'application/json' -Headers @{ 'X-API-Key' = $env:NTTV_API_KEY } -Body '{"query":"When do I learn kusari-fundo?"}'
+```
+
+**Query example (curl.exe):**
+
+```bat
+curl.exe -s -H "Content-Type: application/json" ^
+  -H "X-API-Key: dev-local-key" ^
+  -d "{\"query\":\"When do I learn kusari-fundo?\"}" ^
+  http://127.0.0.1:8000/query
+```
+
+**Response shape:**
+
+```json
+{
+  "answer": "string",
+  "sources": [
+    { "source": "file.md", "page": null, "snippet": "…", "score": 0.43 }
+  ],
+  "det_path": "deterministic/kihon",
+  "meta": {
+    "model": "google/gemma-3n-e4b-it",
+    "retrieval_count": 6,
+    "elapsed_ms": 812
+  }
+}
+```
+
+> **CORS:** `api_server.py` is configured for local development (wide-open CORS). For production, restrict `allow_origins` to your site domain.
+
+---
+
+### 2) Launch the minimal test webpage (no framework)
+
+We ship a tiny, framework-free test page: `nttv_test.html`. Serve it locally to avoid `file://` CORS issues.
+
+```powershell
+# In the folder containing nttv_test.html
+python -m http.server 5500
+# Open in your browser:
+# http://127.0.0.1:5500/nttv_test.html
+```
+
+**Point the page at your API (one-time):**  
+Open the browser DevTools **Console** on `nttv_test.html` and run:
+
+```js
+localStorage.setItem("NTTV_API_BASE","http://127.0.0.1:8000");
+// If you set an API key when launching uvicorn, also set:
+localStorage.setItem("NTTV_API_KEY","dev-local-key");
+location.reload();
+```
+
+Now type a question in the page and you’ll see:
+- The assistant’s answer as a chat bubble
+- A **Deterministic** badge when a rule-based extractor answered
+- Numbered citations (sources + snippets)
+- Basic timing in the metadata line
+
+---
+
+### 3) API Endpoints (summary)
+
+- `GET /` → service banner
+- `GET /healthz` → `{ status, faiss_ntotal, chunks, model }`
+- `POST /query`
+  - **Request:**
+    ```json
+    { "query": "string", "top_k": 6, "max_tokens": 512, "temperature": 0.0 }
+    ```
+    Headers: `Content-Type: application/json` (+ `X-API-Key` if enabled)
+  - **Response:** as shown above under “Response shape”
+
+---
+
+### 4) Common issues
+
+- **Connection refused:** API not running or wrong port. Re-run uvicorn and ensure it logs:
+  `Uvicorn running on http://127.0.0.1:8000`
+- **CORS blocked:** Use the served page (`http://127.0.0.1:5500/...`) and keep the dev CORS config in `api_server.py`. For prod, set strict origins.
+- **401 Unauthorized:** You started uvicorn with `NTTV_API_KEY`. Send `X-API-Key` from the client or unset the env var and restart.
+
+---
+
+### 5) Moving to production later
+
+- Run the same FastAPI app behind `uvicorn`/`gunicorn`.
+- Keep indexes on persistent storage; reuse the same envs (`INDEX_DIR`, `INDEX_PATH`, `META_PATH`, `CONFIG_PATH`, `MODEL`, etc.).
+- Lock down CORS origins, enable rate limiting, and keep your OpenRouter key **server-side only**.
+
+
+---
+
 ## 🔧 Common Issues
 
 ### “Index config / meta not found”
